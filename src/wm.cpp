@@ -658,9 +658,9 @@ void WM::ensure_workspace_exists(int idx) {
 void WM::cleanup_empty_workspaces() {
   std::vector<int> monitor_indices;
   monitor_indices.reserve(monitors_.size());
-  for (const auto& monitor : monitors_) {
-    monitor_indices.push_back(monitor.workspace_idx);
-  }
+  std::transform(monitors_.begin(), monitors_.end(), std::back_inserter(monitor_indices), [](const auto& monitor) {
+    return monitor.workspace_idx;
+  });
 
   const size_t previous_size = workspaces_.size();
   model::cleanup_empty_workspaces(workspaces_, monitor_indices);
@@ -806,9 +806,9 @@ void WM::move_overview_selection(int delta) {
 
   std::vector<std::pair<int, xcb_window_t>> ordered_clients;
   for (const auto& ws : workspaces_) {
-    for (const auto& client : ws.clients()) {
-      ordered_clients.emplace_back(ws.index(), client.window);
-    }
+    std::transform(ws.clients().begin(), ws.clients().end(), std::back_inserter(ordered_clients), [&](const auto& client) {
+      return std::pair{ws.index(), client.window};
+    });
   }
 
   if (ordered_clients.empty()) {
@@ -882,9 +882,9 @@ void WM::relayout() {
 
     std::vector<int> offsets;
     offsets.reserve(workspaces_.size());
-    for (const auto& ws : workspaces_) {
-      offsets.push_back(ws.scroll_offset());
-    }
+    std::transform(workspaces_.begin(), workspaces_.end(), std::back_inserter(offsets), [](const auto& ws) {
+      return ws.scroll_offset();
+    });
 
     const auto render_rects = overview::build_overview_render_rects(
         workspaces_, offsets, layout_engine_, camera, scene, screen_w, screen_h,

@@ -8,12 +8,10 @@ namespace scrollwm::overview {
 namespace {
 
 const WorkspaceSceneEntry* find_scene_entry(const std::vector<WorkspaceSceneEntry>& scene, int workspace_idx) {
-  for (const auto& entry : scene) {
-    if (entry.workspace_idx == workspace_idx) {
-      return &entry;
-    }
-  }
-  return nullptr;
+  const auto it = std::find_if(scene.begin(), scene.end(), [&](const auto& entry) {
+    return entry.workspace_idx == workspace_idx;
+  });
+  return it != scene.end() ? &(*it) : nullptr;
 }
 
 std::optional<xcb_window_t> first_client_for_workspace(const model::Workspace& ws) {
@@ -199,15 +197,10 @@ void normalize_overview_state(OverviewState& state, const std::vector<model::Wor
     return;
   }
 
-  bool found = false;
-  if (ws_it != workspaces.end()) {
-    for (const auto& client : ws_it->clients()) {
-      if (client.window == *state.selected_client) {
-        found = true;
-        break;
-      }
-    }
-  }
+  const bool found = ws_it != workspaces.end() &&
+                     std::any_of(ws_it->clients().begin(), ws_it->clients().end(), [&](const auto& client) {
+                       return client.window == *state.selected_client;
+                     });
 
   if (!found) {
     state.selected_client = (ws_it != workspaces.end()) ? first_client_for_workspace(*ws_it) : std::nullopt;
