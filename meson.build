@@ -17,7 +17,7 @@ add_project_arguments([
   '-Wsign-conversion',
 ], language: 'cpp')
 
-inc = include_directories('src', 'include')
+inc = include_directories('src')
 
 xcb_dep = dependency('xcb', required: true)
 xcb_keysyms_dep = dependency('xcb-keysyms', required: true)
