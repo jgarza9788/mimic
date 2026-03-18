@@ -45,6 +45,16 @@ reorder_next = "Mod+Shift+J"
 reorder_prev = "Mod+Shift+K"
 toggle_fullscreen = "Mod+F"
 
+## Arbitrary executable keybindings (array-of-tables).
+## Each entry requires both `key` and `command`.
+[[exec]]
+key = "Mod+D"
+command = "rofi -show drun"
+
+[[exec]]
+key = "Mod+Shift+L"
+command = "~/.config/scrollwm/lock.sh"
+
 [autostart]
 # If true, run the compositor command below when the WM starts.
 launch_picom = false

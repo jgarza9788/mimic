@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace scrollwm::config {
 
@@ -13,6 +14,11 @@ enum class Direction {
 
 struct Config {
   int schema_version = 1;
+
+  struct ExecBinding {
+    std::string key;
+    std::string command;
+  };
 
   struct BindingSet {
     std::string focus_next = "Mod+J";
@@ -41,6 +47,7 @@ struct Config {
   std::string terminal = "xterm";
   std::string compositor_cmd;
   bool autostart_picom = false;
+  std::vector<ExecBinding> exec_bindings;
 };
 
 Config load_default();

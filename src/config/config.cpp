@@ -38,6 +38,17 @@ bool to_bool(std::string value) {
   return value == "true" || value == "1" || value == "yes";
 }
 
+void flush_exec_binding_if_complete(const std::optional<Config::ExecBinding>& pending,
+                                    Config& cfg) {
+  if (!pending.has_value()) {
+    return;
+  }
+  if (trim(pending->key).empty() || trim(pending->command).empty()) {
+    return;
+  }
+  cfg.exec_bindings.push_back(*pending);
+}
+
 Direction to_direction(const std::string& value) {
   auto normalized = value;
   std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
@@ -121,6 +132,7 @@ Config load_from_path(const std::filesystem::path& path) {
   }
 
   std::string current_section;
+  std::optional<Config::ExecBinding> pending_exec;
   std::string line;
   while (std::getline(file, line)) {
     const auto comment_pos = line.find('#');
@@ -132,7 +144,19 @@ Config load_from_path(const std::filesystem::path& path) {
       continue;
     }
 
+    if (line.rfind("[[", 0) == 0 && line.size() >= 4 && line.substr(line.size() - 2) == "]]") {
+      flush_exec_binding_if_complete(pending_exec, cfg);
+      pending_exec.reset();
+      current_section = trim(line.substr(2, line.size() - 4));
+      if (current_section == "exec") {
+        pending_exec = Config::ExecBinding{};
+      }
+      continue;
+    }
+
     if (line.front() == '[' && line.back() == ']') {
+      flush_exec_binding_if_complete(pending_exec, cfg);
+      pending_exec.reset();
       current_section = trim(line.substr(1, line.size() - 2));
       continue;
     }
@@ -186,6 +210,10 @@ Config load_from_path(const std::filesystem::path& path) {
       cfg.bindings.reorder_prev = strip_quotes(raw_value);
     } else if (qualified_key == "bindings.toggle_fullscreen") {
       cfg.bindings.toggle_fullscreen = strip_quotes(raw_value);
+    } else if (qualified_key == "exec.key" && pending_exec.has_value()) {
+      pending_exec->key = strip_quotes(raw_value);
+    } else if (qualified_key == "exec.command" && pending_exec.has_value()) {
+      pending_exec->command = strip_quotes(raw_value);
     } else if (qualified_key.rfind("bindings.workspace_", 0) == 0) {
       const auto maybe_index = parse_positive_int(qualified_key.substr(std::string("bindings.workspace_").size()));
       if (maybe_index.has_value()) {
@@ -199,6 +227,8 @@ Config load_from_path(const std::filesystem::path& path) {
       }
     }
   }
+
+  flush_exec_binding_if_complete(pending_exec, cfg);
 
   if (cfg.workspace_count < 1) {
     cfg.workspace_count = 1;
