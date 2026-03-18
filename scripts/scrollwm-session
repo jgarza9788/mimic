@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/scrollwm/config.toml"
+
+if [ -f "$CONFIG_FILE" ]; then
+  PICOM_CMD=$(awk -F'=' '/^\s*compositor\s*=/{gsub(/^[ \t]+|[ \t]+$/, "", $2); gsub(/^"|"$/, "", $2); print $2}' "$CONFIG_FILE" | tail -n1 || true)
+  LAUNCH_PICOM=$(awk -F'=' '/^\s*launch_picom\s*=/{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' "$CONFIG_FILE" | tail -n1 || true)
+  if [ "${LAUNCH_PICOM:-false}" = "true" ] && [ -n "${PICOM_CMD:-}" ]; then
+    sh -c "$PICOM_CMD" >/dev/null 2>&1 &
+  fi
+fi
+
+exec scrollwm

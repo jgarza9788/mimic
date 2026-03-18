@@ -1,0 +1,24 @@
+[general]
+mod_key = "Mod4"
+workspace_count = 4
+focus_follows_mouse = false
+terminal = "xterm"
+
+[layout]
+layout_direction = "horizontal"
+
+[appearance]
+gap = 12
+border_width = 2
+outer_padding = 12
+
+[bindings]
+focus_next = "Mod+J"
+focus_prev = "Mod+K"
+spawn_terminal = "Mod+Enter"
+close_window = "Mod+Q"
+exit_wm = "Mod+Shift+E"
+
+[autostart]
+launch_picom = false
+compositor = "picom --experimental-backends"
