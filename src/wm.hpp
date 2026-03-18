@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <xcb/xcb.h>
@@ -34,7 +35,16 @@ class WM {
       Workspace2,
       Workspace3,
       Workspace4,
+      MoveToWorkspace1,
+      MoveToWorkspace2,
+      MoveToWorkspace3,
+      MoveToWorkspace4,
     } action;
+  };
+
+  struct SizeConstraints {
+    uint32_t min_width = 0;
+    uint32_t min_height = 0;
   };
 
   bool setup();
@@ -60,7 +70,13 @@ class WM {
   void focus_next();
   void focus_prev();
   void switch_workspace(int idx);
+  void move_focused_to_workspace(int idx);
   void kill_focused();
+  void update_window_state_property(const model::Client& client);
+  bool is_dialog_window(xcb_window_t window) const;
+  bool is_transient_window(xcb_window_t window) const;
+  SizeConstraints query_size_constraints(xcb_window_t window) const;
+  std::optional<KeyBinding> parse_keybinding(const std::string& combo, KeyBinding::Action action) const;
 
   void relayout();
   model::Workspace& current_workspace();
@@ -83,6 +99,7 @@ class WM {
   int current_workspace_idx_ = 0;
 
   std::vector<KeyBinding> bindings_;
+  std::unordered_map<xcb_window_t, SizeConstraints> size_constraints_;
 };
 
 }  // namespace scrollwm

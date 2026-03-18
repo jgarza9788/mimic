@@ -11,6 +11,22 @@ enum class Direction {
 };
 
 struct Config {
+  struct BindingSet {
+    std::string focus_next = "Mod+J";
+    std::string focus_prev = "Mod+K";
+    std::string spawn_terminal = "Mod+Enter";
+    std::string close_window = "Mod+Q";
+    std::string exit_wm = "Mod+Shift+E";
+    std::string workspace_1 = "Mod+1";
+    std::string workspace_2 = "Mod+2";
+    std::string workspace_3 = "Mod+3";
+    std::string workspace_4 = "Mod+4";
+    std::string move_to_workspace_1 = "Mod+Shift+1";
+    std::string move_to_workspace_2 = "Mod+Shift+2";
+    std::string move_to_workspace_3 = "Mod+Shift+3";
+    std::string move_to_workspace_4 = "Mod+Shift+4";
+  } bindings;
+
   std::string mod_key = "Mod4";
   Direction layout_direction = Direction::Horizontal;
   int gap = 12;

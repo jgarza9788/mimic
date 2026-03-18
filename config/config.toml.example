@@ -15,9 +15,17 @@ outer_padding = 12
 [bindings]
 focus_next = "Mod+J"
 focus_prev = "Mod+K"
-spawn_terminal = "Mod+Enter"
+spawn_terminal = "Mod+Return"
 close_window = "Mod+Q"
 exit_wm = "Mod+Shift+E"
+workspace_1 = "Mod+1"
+workspace_2 = "Mod+2"
+workspace_3 = "Mod+3"
+workspace_4 = "Mod+4"
+move_to_workspace_1 = "Mod+Shift+1"
+move_to_workspace_2 = "Mod+Shift+2"
+move_to_workspace_3 = "Mod+Shift+3"
+move_to_workspace_4 = "Mod+Shift+4"
 
 [autostart]
 launch_picom = false
