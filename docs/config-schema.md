@@ -16,7 +16,7 @@ If omitted, ScrollWM assumes `version = 1` for backward compatibility.
 - `[layout]`: `layout_direction` (`"horizontal"` or `"vertical"`)
 - `[appearance]`: `gap` (int), `border_width` (int), `outer_padding` (int)
 - `[autostart]`: `launch_picom` (bool), `compositor` (string)
-- `[bindings]`: keybinding strings for all WM actions
+- `[bindings]`: keybinding strings for all WM actions, including dynamic `workspace_N` and `move_to_workspace_N` keys
 
 ## Validation
 

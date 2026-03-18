@@ -32,19 +32,14 @@ class WM {
       SpawnTerminal,
       CloseFocused,
       Exit,
-      Workspace1,
-      Workspace2,
-      Workspace3,
-      Workspace4,
-      MoveToWorkspace1,
-      MoveToWorkspace2,
-      MoveToWorkspace3,
-      MoveToWorkspace4,
+      SwitchWorkspace,
+      MoveToWorkspace,
       ToggleLayoutDirection,
       ReorderNext,
       ReorderPrev,
       ToggleFullscreen,
     } action;
+    int workspace_idx = -1;
   };
 
   struct SizeConstraints {

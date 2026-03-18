@@ -1,12 +1,13 @@
 #include "config/config.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
-#include <unordered_map>
 
 namespace scrollwm::config {
 
@@ -48,7 +49,56 @@ Direction to_direction(const std::string& value) {
   return Direction::Horizontal;
 }
 
+std::optional<int> parse_positive_int(const std::string& value) {
+  int parsed = 0;
+  const auto* begin = value.data();
+  const auto* end = value.data() + value.size();
+  const auto [ptr, ec] = std::from_chars(begin, end, parsed);
+  if (ec != std::errc() || ptr != end || parsed < 1) {
+    return std::nullopt;
+  }
+  return parsed;
+}
+
 }  // namespace
+
+std::string Config::BindingSet::workspace_binding(int one_based_index) const {
+  if (const auto it = workspace.find(one_based_index); it != workspace.end()) {
+    return it->second;
+  }
+
+  switch (one_based_index) {
+    case 1:
+      return "Mod+1";
+    case 2:
+      return "Mod+2";
+    case 3:
+      return "Mod+3";
+    case 4:
+      return "Mod+4";
+    default:
+      return {};
+  }
+}
+
+std::string Config::BindingSet::move_to_workspace_binding(int one_based_index) const {
+  if (const auto it = move_to_workspace.find(one_based_index); it != move_to_workspace.end()) {
+    return it->second;
+  }
+
+  switch (one_based_index) {
+    case 1:
+      return "Mod+Shift+1";
+    case 2:
+      return "Mod+Shift+2";
+    case 3:
+      return "Mod+Shift+3";
+    case 4:
+      return "Mod+Shift+4";
+    default:
+      return {};
+  }
+}
 
 Config load_default() {
   return Config{};
@@ -128,22 +178,6 @@ Config load_from_path(const std::filesystem::path& path) {
       cfg.bindings.close_window = strip_quotes(raw_value);
     } else if (qualified_key == "bindings.exit_wm") {
       cfg.bindings.exit_wm = strip_quotes(raw_value);
-    } else if (qualified_key == "bindings.workspace_1") {
-      cfg.bindings.workspace_1 = strip_quotes(raw_value);
-    } else if (qualified_key == "bindings.workspace_2") {
-      cfg.bindings.workspace_2 = strip_quotes(raw_value);
-    } else if (qualified_key == "bindings.workspace_3") {
-      cfg.bindings.workspace_3 = strip_quotes(raw_value);
-    } else if (qualified_key == "bindings.workspace_4") {
-      cfg.bindings.workspace_4 = strip_quotes(raw_value);
-    } else if (qualified_key == "bindings.move_to_workspace_1") {
-      cfg.bindings.move_to_workspace_1 = strip_quotes(raw_value);
-    } else if (qualified_key == "bindings.move_to_workspace_2") {
-      cfg.bindings.move_to_workspace_2 = strip_quotes(raw_value);
-    } else if (qualified_key == "bindings.move_to_workspace_3") {
-      cfg.bindings.move_to_workspace_3 = strip_quotes(raw_value);
-    } else if (qualified_key == "bindings.move_to_workspace_4") {
-      cfg.bindings.move_to_workspace_4 = strip_quotes(raw_value);
     } else if (qualified_key == "bindings.toggle_layout_direction") {
       cfg.bindings.toggle_layout_direction = strip_quotes(raw_value);
     } else if (qualified_key == "bindings.reorder_next") {
@@ -152,6 +186,17 @@ Config load_from_path(const std::filesystem::path& path) {
       cfg.bindings.reorder_prev = strip_quotes(raw_value);
     } else if (qualified_key == "bindings.toggle_fullscreen") {
       cfg.bindings.toggle_fullscreen = strip_quotes(raw_value);
+    } else if (qualified_key.rfind("bindings.workspace_", 0) == 0) {
+      const auto maybe_index = parse_positive_int(qualified_key.substr(std::string("bindings.workspace_").size()));
+      if (maybe_index.has_value()) {
+        cfg.bindings.workspace[*maybe_index] = strip_quotes(raw_value);
+      }
+    } else if (qualified_key.rfind("bindings.move_to_workspace_", 0) == 0) {
+      const auto maybe_index = parse_positive_int(
+          qualified_key.substr(std::string("bindings.move_to_workspace_").size()));
+      if (maybe_index.has_value()) {
+        cfg.bindings.move_to_workspace[*maybe_index] = strip_quotes(raw_value);
+      }
     }
   }
 
