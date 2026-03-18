@@ -21,16 +21,25 @@ void Workspace::add_client(Client client) {
 void Workspace::remove_client(xcb_window_t window) {
   for (size_t i = 0; i < clients_.size(); ++i) {
     if (clients_[i].window == window) {
+      const bool removed_was_focused = focused_index_.has_value() && *focused_index_ == i;
       clients_.erase(clients_.begin() + static_cast<std::ptrdiff_t>(i));
       focus_history_.erase(std::remove(focus_history_.begin(), focus_history_.end(), window), focus_history_.end());
       if (clients_.empty()) {
         focused_index_.reset();
       } else if (focused_index_.has_value()) {
-        if (*focused_index_ >= clients_.size()) {
+        if (*focused_index_ > i) {
+          focused_index_ = *focused_index_ - 1;
+        } else if (*focused_index_ == i) {
+          if (i >= clients_.size()) {
+            focused_index_ = clients_.size() - 1;
+          } else {
+            focused_index_ = i;
+          }
+        } else if (*focused_index_ >= clients_.size()) {
           focused_index_ = clients_.size() - 1;
         }
       }
-      if (!clients_.empty()) {
+      if (!clients_.empty() && !removed_was_focused && !focused_index_.has_value()) {
         for (auto it = focus_history_.rbegin(); it != focus_history_.rend(); ++it) {
           for (size_t j = 0; j < clients_.size(); ++j) {
             if (clients_[j].window == *it) {
