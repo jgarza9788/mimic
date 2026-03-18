@@ -10,6 +10,7 @@ ScrollWM is an experimental scrollable tiling window manager for X11/XLibre, ins
 - Scrollable linear layout (horizontal or vertical)
 - Focus navigation (`Mod+j` / `Mod+k`) with viewport shifting
 - Dynamic workspaces with automatic cleanup (empty workspaces are removed while always keeping one alive)
+- Niri-style Overview mode: zoomed-out multi-workspace scene on one monitor
 - Simple TOML config loader (`~/.config/scrollwm/config.toml`)
 - XSessions integration for display managers
 - Optional picom startup via session wrapper and config
@@ -99,6 +100,8 @@ exec scrollwm-session
 - `Mod+Space`: toggle layout direction (horizontal/vertical) at runtime
 - `Mod+Shift+j` / `Mod+Shift+k`: reorder focused window in scroll order
 - `Mod+f`: toggle fullscreen on focused tiled window (with restore)
+- `Mod+Tab`: toggle overview (zoomed-out camera showing all workspaces)
+- `Return` (while in overview): activate selected window/workspace and exit overview
 - `[[exec]]`: bind arbitrary shell commands to keys (for launchers, lock scripts, etc.)
 
 ## Config
@@ -116,7 +119,7 @@ Configuration sections currently parsed:
 - `[layout]`: `layout_direction`
 - `[appearance]`: `gap`, `border_width`, `outer_padding`
 - `[autostart]`: `launch_picom`, `compositor`
-- `[bindings]`: includes dynamic `workspace_N` / `move_to_workspace_N` entries for any workspace index `N >= 1`
+- `[bindings]`: includes dynamic `workspace_N` / `move_to_workspace_N` entries for any workspace index `N >= 1`, plus `toggle_overview` and `activate_overview`
 - `[[exec]]`: repeated array-of-tables entries with `key` + `command` for arbitrary shell execution
 
 See [`config/config.toml.example`](config/config.toml.example).

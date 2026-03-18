@@ -48,6 +48,10 @@ toggle_layout_direction = "Mod+Space"
 reorder_next = "Mod+Shift+J"
 reorder_prev = "Mod+Shift+K"
 toggle_fullscreen = "Mod+F"
+# Toggle multi-workspace zoomed overview scene.
+toggle_overview = "Mod+Tab"
+# Activate current overview selection (window/workspace) and exit overview.
+activate_overview = "Return"
 
 ## Arbitrary executable keybindings (array-of-tables).
 ## Each entry requires both `key` and `command`.

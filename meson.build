@@ -36,6 +36,7 @@ scrollwm_sources = files(
   'src/model/workspace.cpp',
   'src/config/config.cpp',
   'src/util/log.cpp',
+  'src/overview/overview.cpp',
 )
 
 executable('scrollwm',
@@ -52,6 +53,7 @@ scrollwm_unit_tests = executable('scrollwm-unit-tests',
     'src/model/workspace.cpp',
     'src/model/client.cpp',
     'src/config/config.cpp',
+    'src/overview/overview.cpp',
   ),
   include_directories: inc,
   dependencies: [xcb_dep],

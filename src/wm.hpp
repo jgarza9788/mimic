@@ -12,6 +12,7 @@
 #include "config/config.hpp"
 #include "layout/scroll_layout.hpp"
 #include "model/workspace.hpp"
+#include "overview/overview.hpp"
 #include "x11/atoms.hpp"
 #include "x11/connection.hpp"
 
@@ -38,6 +39,8 @@ class WM {
       ReorderNext,
       ReorderPrev,
       ToggleFullscreen,
+      ToggleOverview,
+      ActivateOverviewSelection,
       ExecCommand,
     } action;
     int workspace_idx = -1;
@@ -91,6 +94,12 @@ class WM {
   void reorder_focused_backward();
   void toggle_layout_direction();
   void toggle_focused_fullscreen();
+  void toggle_overview();
+  void activate_overview_selection();
+  void move_overview_selection(int delta);
+  void select_overview_workspace(int idx);
+  void normalize_overview_after_workspace_change();
+
   void kill_focused();
   void update_window_state_property(const model::Client& client);
   void clear_urgency(xcb_window_t window);
@@ -126,6 +135,7 @@ class WM {
   std::vector<KeyBinding> bindings_;
   std::unordered_map<xcb_window_t, SizeConstraints> size_constraints_;
   std::unordered_map<xcb_window_t, SavedGeometry> saved_geometry_;
+  overview::OverviewState overview_state_;
 };
 
 }  // namespace scrollwm

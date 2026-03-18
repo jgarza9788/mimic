@@ -32,6 +32,8 @@ struct Config {
     std::string reorder_next = "Mod+Shift+J";
     std::string reorder_prev = "Mod+Shift+K";
     std::string toggle_fullscreen = "Mod+F";
+    std::string toggle_overview = "Mod+Tab";
+    std::string activate_overview = "Return";
 
     std::string workspace_binding(int one_based_index) const;
     std::string move_to_workspace_binding(int one_based_index) const;

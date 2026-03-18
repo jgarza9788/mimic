@@ -210,6 +210,10 @@ Config load_from_path(const std::filesystem::path& path) {
       cfg.bindings.reorder_prev = strip_quotes(raw_value);
     } else if (qualified_key == "bindings.toggle_fullscreen") {
       cfg.bindings.toggle_fullscreen = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.toggle_overview") {
+      cfg.bindings.toggle_overview = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.activate_overview") {
+      cfg.bindings.activate_overview = strip_quotes(raw_value);
     } else if (qualified_key == "exec.key" && pending_exec.has_value()) {
       pending_exec->key = strip_quotes(raw_value);
     } else if (qualified_key == "exec.command" && pending_exec.has_value()) {
