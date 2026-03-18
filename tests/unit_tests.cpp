@@ -18,6 +18,14 @@ using scrollwm::layout::Rect;
 using scrollwm::layout::ScrollLayout;
 using scrollwm::model::Workspace;
 
+Workspace make_workspace_with_clients(int idx, std::initializer_list<xcb_window_t> windows) {
+  Workspace ws(idx);
+  for (xcb_window_t window : windows) {
+    ws.add_client({.window = window});
+  }
+  return ws;
+}
+
 bool expect(bool condition, const std::string& message) {
   if (!condition) {
     std::cerr << message << "\n";
@@ -239,6 +247,137 @@ bool test_workspace_focus_index_out_of_range_noop() {
                 "focus_index out of range should not change focus");
 }
 
+bool test_dynamic_workspace_cleanup_removes_empty_non_last_workspace() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {1}));
+  workspaces.push_back(make_workspace_with_clients(1, {}));
+  workspaces.push_back(make_workspace_with_clients(2, {2}));
+  std::vector<int> tracked = {2};
+
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+
+  return expect(workspaces.size() == 2, "empty middle workspace should be removed") &&
+         expect(workspaces[0].index() == 0 && workspaces[1].index() == 1,
+                "workspace indices should be compacted") &&
+         expect(tracked[0] == 1, "tracked index should shift when earlier workspace removed");
+}
+
+bool test_dynamic_workspace_cleanup_keeps_last_workspace_alive() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {}));
+  std::vector<int> tracked = {0};
+
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+
+  return expect(workspaces.size() == 1, "cleanup should keep one workspace") &&
+         expect(workspaces[0].index() == 0, "last workspace index should remain zero") &&
+         expect(tracked[0] == 0, "tracked index should remain valid");
+}
+
+bool test_dynamic_workspace_cleanup_focused_workspace_falls_forward() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {10}));
+  workspaces.push_back(make_workspace_with_clients(1, {}));
+  workspaces.push_back(make_workspace_with_clients(2, {20}));
+  std::vector<int> tracked = {1};
+
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+
+  return expect(workspaces.size() == 2, "focused empty workspace should be removed") &&
+         expect(tracked[0] == 1, "focus should fall forward to nearest surviving workspace");
+}
+
+bool test_dynamic_workspace_cleanup_focused_workspace_falls_backward_at_end() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {10}));
+  workspaces.push_back(make_workspace_with_clients(1, {}));
+  std::vector<int> tracked = {1};
+
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+
+  return expect(workspaces.size() == 1, "tail empty workspace should be removed") &&
+         expect(tracked[0] == 0, "focus should fall backward when no forward workspace exists");
+}
+
+bool test_dynamic_workspace_cleanup_repeated_deletions_stable() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {}));
+  workspaces.push_back(make_workspace_with_clients(1, {11}));
+  workspaces.push_back(make_workspace_with_clients(2, {}));
+  workspaces.push_back(make_workspace_with_clients(3, {33}));
+  workspaces.push_back(make_workspace_with_clients(4, {}));
+  std::vector<int> tracked = {3};
+
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+  const bool first_pass = expect(workspaces.size() == 2, "all non-last empty workspaces should be removed") &&
+                          expect(tracked[0] == 1, "tracked index should be updated after repeated removals");
+
+  workspaces[0].remove_client(11);
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+  const bool second_pass = expect(workspaces.size() == 1, "cleanup should continue to remove newly empty workspaces") &&
+                           expect(tracked[0] == 0, "tracked index should remain valid after second cleanup");
+
+  return first_pass && second_pass;
+}
+
+bool test_dynamic_workspace_cleanup_delete_first_and_last_and_middle() {
+  std::vector<Workspace> first_case;
+  first_case.push_back(make_workspace_with_clients(0, {}));
+  first_case.push_back(make_workspace_with_clients(1, {1}));
+  std::vector<int> first_tracked = {1};
+  scrollwm::model::cleanup_empty_workspaces(first_case, first_tracked);
+  const bool first_ok = expect(first_case.size() == 1, "first workspace deletion should work") &&
+                        expect(first_tracked[0] == 0, "focus should shift after first deletion");
+
+  std::vector<Workspace> last_case;
+  last_case.push_back(make_workspace_with_clients(0, {1}));
+  last_case.push_back(make_workspace_with_clients(1, {}));
+  std::vector<int> last_tracked = {0};
+  scrollwm::model::cleanup_empty_workspaces(last_case, last_tracked);
+  const bool last_ok = expect(last_case.size() == 1, "last workspace deletion should work") &&
+                       expect(last_tracked[0] == 0, "focus should remain on first workspace");
+
+  std::vector<Workspace> middle_case;
+  middle_case.push_back(make_workspace_with_clients(0, {1}));
+  middle_case.push_back(make_workspace_with_clients(1, {}));
+  middle_case.push_back(make_workspace_with_clients(2, {2}));
+  std::vector<int> middle_tracked = {0};
+  scrollwm::model::cleanup_empty_workspaces(middle_case, middle_tracked);
+  const bool middle_ok = expect(middle_case.size() == 2, "middle workspace deletion should work") &&
+                         expect(middle_tracked[0] == 0, "focus before removed workspace should remain stable");
+
+  return first_ok && last_ok && middle_ok;
+}
+
+bool test_dynamic_workspace_ensure_exists_expands_contiguously() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {1}));
+
+  scrollwm::model::ensure_workspace_exists(workspaces, 3);
+
+  return expect(workspaces.size() == 4, "ensure should create all missing intermediate workspaces") &&
+         expect(workspaces[3].index() == 3, "new workspace index should match requested slot") &&
+         expect(workspaces[1].clients().empty() && workspaces[2].clients().empty(),
+                "new intermediate workspaces should start empty");
+}
+
+bool test_dynamic_workspace_move_client_cleanup_simulation() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {1}));
+  workspaces.push_back(make_workspace_with_clients(1, {2}));
+  std::vector<int> tracked = {0};
+
+  const auto moved = workspaces[0].clients()[0];
+  workspaces[0].remove_client(moved.window);
+  scrollwm::model::ensure_workspace_exists(workspaces, 1);
+  workspaces[1].add_client(moved);
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+
+  return expect(workspaces.size() == 1, "moving only client out should remove empty source workspace") &&
+         expect(workspaces[0].clients().size() == 2, "destination workspace should contain moved client") &&
+         expect(tracked[0] == 0, "tracked index should remain valid after move cleanup");
+}
+
 bool test_layout_empty_workspace_returns_no_rects() {
   Workspace ws(0);
   ScrollLayout layout(Direction::Horizontal);
@@ -374,6 +513,14 @@ int main() {
       {"workspace reorder boundaries", test_workspace_reorder_boundaries_and_wrap_behavior},
       {"workspace focus urgent none", test_workspace_focus_urgent_when_none_exists},
       {"workspace focus index out of range", test_workspace_focus_index_out_of_range_noop},
+      {"workspace cleanup removes empty non-last", test_dynamic_workspace_cleanup_removes_empty_non_last_workspace},
+      {"workspace cleanup keeps last", test_dynamic_workspace_cleanup_keeps_last_workspace_alive},
+      {"workspace cleanup focused fallback forward", test_dynamic_workspace_cleanup_focused_workspace_falls_forward},
+      {"workspace cleanup focused fallback backward", test_dynamic_workspace_cleanup_focused_workspace_falls_backward_at_end},
+      {"workspace cleanup repeated deletions", test_dynamic_workspace_cleanup_repeated_deletions_stable},
+      {"workspace cleanup first/last/middle", test_dynamic_workspace_cleanup_delete_first_and_last_and_middle},
+      {"workspace ensure exists contiguous", test_dynamic_workspace_ensure_exists_expands_contiguously},
+      {"workspace move cleanup simulation", test_dynamic_workspace_move_client_cleanup_simulation},
       {"layout empty", test_layout_empty_workspace_returns_no_rects},
       {"layout single", test_layout_single_client_is_sensible},
       {"layout horizontal+vertical sanity", test_layout_horizontal_vertical_geometry_sanity},

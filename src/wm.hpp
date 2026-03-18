@@ -84,6 +84,9 @@ class WM {
   void focus_prev();
   void switch_workspace(int idx);
   void move_focused_to_workspace(int idx);
+  void ensure_workspace_exists(int idx);
+  void cleanup_empty_workspaces();
+  int find_workspace_of_client(xcb_window_t window) const;
   void reorder_focused_forward();
   void reorder_focused_backward();
   void toggle_layout_direction();

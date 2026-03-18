@@ -5,7 +5,7 @@ version = 1
 [general]
 # Modifier key used in keyboard shortcuts. Common options: "Mod4" (Super/Win) or "Mod1" (Alt).
 mod_key = "Mod4"
-# Number of workspaces to create at startup.
+# Number of workspaces to create at startup (empty workspaces are cleaned up dynamically).
 workspace_count = 4
 # If true, moving the mouse over a window will focus it automatically.
 focus_follows_mouse = false
@@ -43,7 +43,7 @@ move_to_workspace_3 = "Mod+Shift+3"
 move_to_workspace_4 = "Mod+Shift+4"
 move_to_workspace_5 = "Mod+Shift+5"
 move_to_workspace_6 = "Mod+Shift+6"
-# Add workspace_N / move_to_workspace_N for any N >= 1 as needed for your workspace_count.
+# Add workspace_N / move_to_workspace_N for any N >= 1. Missing workspaces are created on demand.
 toggle_layout_direction = "Mod+Space"
 reorder_next = "Mod+Shift+J"
 reorder_prev = "Mod+Shift+K"

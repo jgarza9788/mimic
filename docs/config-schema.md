@@ -12,7 +12,7 @@ If omitted, ScrollWM assumes `version = 1` for backward compatibility.
 ## Schema v1 sections
 
 - `[schema]`: `version` (int, must be `1`)
-- `[general]`: `mod_key` (string), `workspace_count` (int), `focus_follows_mouse` (bool), `terminal` (string)
+- `[general]`: `mod_key` (string), `workspace_count` (int, initial workspace count), `focus_follows_mouse` (bool), `terminal` (string)
 - `[layout]`: `layout_direction` (`"horizontal"` or `"vertical"`)
 - `[appearance]`: `gap` (int), `border_width` (int), `outer_padding` (int)
 - `[autostart]`: `launch_picom` (bool), `compositor` (string)
