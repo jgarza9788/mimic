@@ -34,6 +34,8 @@ ALLOWED_SCHEMA: dict[str, dict[str, type | tuple[type, ...]]] = {
         "reorder_next": str,
         "reorder_prev": str,
         "toggle_fullscreen": str,
+        "toggle_overview": str,
+        "activate_overview": str,
     },
 }
 
