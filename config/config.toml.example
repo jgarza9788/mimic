@@ -39,6 +39,7 @@ move_to_workspace_1 = "Mod+Shift+1"
 move_to_workspace_2 = "Mod+Shift+2"
 move_to_workspace_3 = "Mod+Shift+3"
 move_to_workspace_4 = "Mod+Shift+4"
+# Add workspace_5 / move_to_workspace_5, etc. as needed when workspace_count > 4.
 toggle_layout_direction = "Mod+Space"
 reorder_next = "Mod+Shift+J"
 reorder_prev = "Mod+Shift+K"

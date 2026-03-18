@@ -199,14 +199,19 @@ void WM::setup_keys() {
   add_binding(config_.bindings.spawn_terminal, KeyBinding::Action::SpawnTerminal);
   add_binding(config_.bindings.close_window, KeyBinding::Action::CloseFocused);
   add_binding(config_.bindings.exit_wm, KeyBinding::Action::Exit);
-  add_binding(config_.bindings.workspace_1, KeyBinding::Action::Workspace1);
-  add_binding(config_.bindings.workspace_2, KeyBinding::Action::Workspace2);
-  add_binding(config_.bindings.workspace_3, KeyBinding::Action::Workspace3);
-  add_binding(config_.bindings.workspace_4, KeyBinding::Action::Workspace4);
-  add_binding(config_.bindings.move_to_workspace_1, KeyBinding::Action::MoveToWorkspace1);
-  add_binding(config_.bindings.move_to_workspace_2, KeyBinding::Action::MoveToWorkspace2);
-  add_binding(config_.bindings.move_to_workspace_3, KeyBinding::Action::MoveToWorkspace3);
-  add_binding(config_.bindings.move_to_workspace_4, KeyBinding::Action::MoveToWorkspace4);
+  for (int i = 0; i < config_.workspace_count; ++i) {
+    if (auto parsed = parse_keybinding(config_.bindings.workspace_binding(i + 1), KeyBinding::Action::SwitchWorkspace);
+        parsed.has_value()) {
+      parsed->workspace_idx = i;
+      bindings_.push_back(*parsed);
+    }
+    if (auto parsed =
+            parse_keybinding(config_.bindings.move_to_workspace_binding(i + 1), KeyBinding::Action::MoveToWorkspace);
+        parsed.has_value()) {
+      parsed->workspace_idx = i;
+      bindings_.push_back(*parsed);
+    }
+  }
   add_binding(config_.bindings.toggle_layout_direction, KeyBinding::Action::ToggleLayoutDirection);
   add_binding(config_.bindings.reorder_next, KeyBinding::Action::ReorderNext);
   add_binding(config_.bindings.reorder_prev, KeyBinding::Action::ReorderPrev);
@@ -345,29 +350,15 @@ void WM::handle_key_press(const xcb_key_press_event_t& event) {
       case KeyBinding::Action::Exit:
         running_ = false;
         break;
-      case KeyBinding::Action::Workspace1:
-        switch_workspace(0);
+      case KeyBinding::Action::SwitchWorkspace:
+        if (binding.workspace_idx >= 0) {
+          switch_workspace(binding.workspace_idx);
+        }
         break;
-      case KeyBinding::Action::Workspace2:
-        switch_workspace(1);
-        break;
-      case KeyBinding::Action::Workspace3:
-        switch_workspace(2);
-        break;
-      case KeyBinding::Action::Workspace4:
-        switch_workspace(3);
-        break;
-      case KeyBinding::Action::MoveToWorkspace1:
-        move_focused_to_workspace(0);
-        break;
-      case KeyBinding::Action::MoveToWorkspace2:
-        move_focused_to_workspace(1);
-        break;
-      case KeyBinding::Action::MoveToWorkspace3:
-        move_focused_to_workspace(2);
-        break;
-      case KeyBinding::Action::MoveToWorkspace4:
-        move_focused_to_workspace(3);
+      case KeyBinding::Action::MoveToWorkspace:
+        if (binding.workspace_idx >= 0) {
+          move_focused_to_workspace(binding.workspace_idx);
+        }
         break;
       case KeyBinding::Action::ToggleLayoutDirection:
         toggle_layout_direction();

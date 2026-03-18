@@ -112,7 +112,9 @@ bool test_config_parse() {
     out << "outer_padding = 8\n";
     out << "[bindings]\n";
     out << "workspace_1 = \"Mod+F1\"\n";
+    out << "workspace_6 = \"Mod+F6\"\n";
     out << "move_to_workspace_1 = \"Mod+Shift+F1\"\n";
+    out << "move_to_workspace_6 = \"Mod+Shift+F6\"\n";
     out << "[autostart]\n";
     out << "launch_picom = true\n";
     out << "compositor = \"picom --backend glx\"\n";
@@ -142,7 +144,10 @@ bool test_config_parse() {
     return false;
   }
 
-  if (cfg.bindings.workspace_1 != "Mod+F1" || cfg.bindings.move_to_workspace_1 != "Mod+Shift+F1") {
+  if (cfg.bindings.workspace_binding(1) != "Mod+F1" ||
+      cfg.bindings.workspace_binding(6) != "Mod+F6" ||
+      cfg.bindings.move_to_workspace_binding(1) != "Mod+Shift+F1" ||
+      cfg.bindings.move_to_workspace_binding(6) != "Mod+Shift+F6") {
     std::cerr << "bindings parse mismatch\n";
     return false;
   }

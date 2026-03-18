@@ -9,7 +9,7 @@ ScrollWM is an experimental scrollable tiling window manager for X11/XLibre, ins
 - Core event handling: map/unmap/destroy/configure/key/focus
 - Scrollable linear layout (horizontal or vertical)
 - Focus navigation (`Mod+j` / `Mod+k`) with viewport shifting
-- 4 workspaces by default (`Mod+1..4`)
+- Dynamic workspaces (count controlled by `workspace_count`; default shortcuts for `Mod+1..4`)
 - Simple TOML config loader (`~/.config/scrollwm/config.toml`)
 - XSessions integration for display managers
 - Optional picom startup via session wrapper and config
@@ -93,7 +93,7 @@ exec scrollwm-session
 - `Mod+Enter`: launch terminal
 - `Mod+j`: focus next
 - `Mod+k`: focus previous
-- `Mod+1..4`: switch workspace
+- `Mod+1..4`: switch workspace (defaults; extend with `workspace_5`, `workspace_6`, etc.)
 - `Mod+q`: close focused window (WM_DELETE_WINDOW)
 - `Mod+Shift+e`: exit ScrollWM
 - `Mod+Space`: toggle layout direction (horizontal/vertical) at runtime
@@ -115,6 +115,7 @@ Configuration sections currently parsed:
 - `[layout]`: `layout_direction`
 - `[appearance]`: `gap`, `border_width`, `outer_padding`
 - `[autostart]`: `launch_picom`, `compositor`
+- `[bindings]`: includes dynamic `workspace_N` / `move_to_workspace_N` entries for any workspace index `N >= 1`
 
 See [`config/config.toml.example`](config/config.toml.example).
 

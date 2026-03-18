@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 
 namespace scrollwm::config {
 
@@ -19,18 +20,15 @@ struct Config {
     std::string spawn_terminal = "Mod+Enter";
     std::string close_window = "Mod+Q";
     std::string exit_wm = "Mod+Shift+E";
-    std::string workspace_1 = "Mod+1";
-    std::string workspace_2 = "Mod+2";
-    std::string workspace_3 = "Mod+3";
-    std::string workspace_4 = "Mod+4";
-    std::string move_to_workspace_1 = "Mod+Shift+1";
-    std::string move_to_workspace_2 = "Mod+Shift+2";
-    std::string move_to_workspace_3 = "Mod+Shift+3";
-    std::string move_to_workspace_4 = "Mod+Shift+4";
+    std::unordered_map<int, std::string> workspace;
+    std::unordered_map<int, std::string> move_to_workspace;
     std::string toggle_layout_direction = "Mod+Space";
     std::string reorder_next = "Mod+Shift+J";
     std::string reorder_prev = "Mod+Shift+K";
     std::string toggle_fullscreen = "Mod+F";
+
+    std::string workspace_binding(int one_based_index) const;
+    std::string move_to_workspace_binding(int one_based_index) const;
   } bindings;
 
   std::string mod_key = "Mod4";
