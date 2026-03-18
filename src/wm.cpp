@@ -12,6 +12,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <xcb/xcb_icccm.h>
@@ -217,6 +218,8 @@ void WM::setup_keys() {
   add_binding(config_.bindings.reorder_next, KeyBinding::Action::ReorderNext);
   add_binding(config_.bindings.reorder_prev, KeyBinding::Action::ReorderPrev);
   add_binding(config_.bindings.toggle_fullscreen, KeyBinding::Action::ToggleFullscreen);
+  add_binding(config_.bindings.toggle_overview, KeyBinding::Action::ToggleOverview);
+  add_binding(config_.bindings.activate_overview, KeyBinding::Action::ActivateOverviewSelection);
   for (const auto& exec_binding : config_.exec_bindings) {
     if (auto parsed = parse_keybinding(exec_binding.key, KeyBinding::Action::ExecCommand);
         parsed.has_value()) {
@@ -379,6 +382,12 @@ void WM::handle_key_press(const xcb_key_press_event_t& event) {
         break;
       case KeyBinding::Action::ToggleFullscreen:
         toggle_focused_fullscreen();
+        break;
+      case KeyBinding::Action::ToggleOverview:
+        toggle_overview();
+        break;
+      case KeyBinding::Action::ActivateOverviewSelection:
+        activate_overview_selection();
         break;
       case KeyBinding::Action::ExecCommand:
         spawn_command(binding.command);
@@ -543,6 +552,12 @@ void WM::focus_window(xcb_window_t window) {
 }
 
 void WM::focus_next() {
+  if (overview_state_.active) {
+    move_overview_selection(1);
+    relayout();
+    return;
+  }
+
   auto& ws = current_workspace();
   ws.focus_urgent();
   ws.focus_next();
@@ -553,6 +568,12 @@ void WM::focus_next() {
 }
 
 void WM::focus_prev() {
+  if (overview_state_.active) {
+    move_overview_selection(-1);
+    relayout();
+    return;
+  }
+
   auto& ws = current_workspace();
   ws.focus_urgent();
   ws.focus_prev();
@@ -567,6 +588,11 @@ void WM::switch_workspace(int idx) {
     return;
   }
   ensure_workspace_exists(idx);
+
+  if (overview_state_.active) {
+    select_overview_workspace(idx);
+    return;
+  }
 
   auto& monitor = monitors_[static_cast<size_t>(active_monitor_idx_)];
   if (idx == monitor.workspace_idx) {
@@ -587,6 +613,10 @@ void WM::switch_workspace(int idx) {
 }
 
 void WM::move_focused_to_workspace(int idx) {
+  if (overview_state_.active) {
+    return;
+  }
+
   const int current_workspace_idx =
       monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx;
   if (idx < 0 || idx == current_workspace_idx) {
@@ -622,6 +652,7 @@ void WM::ensure_workspace_exists(int idx) {
   if (workspaces_.size() != previous_size) {
     set_desktop_properties();
   }
+  normalize_overview_after_workspace_change();
 }
 
 void WM::cleanup_empty_workspaces() {
@@ -641,6 +672,7 @@ void WM::cleanup_empty_workspaces() {
   if (workspaces_.size() != previous_size) {
     set_desktop_properties();
   }
+  normalize_overview_after_workspace_change();
 }
 
 int WM::find_workspace_of_client(xcb_window_t window) const {
@@ -699,7 +731,205 @@ void WM::kill_focused() {
                  reinterpret_cast<const char*>(&event));
 }
 
+void WM::toggle_overview() {
+  if (!overview_state_.active) {
+    overview_state_.active = true;
+    overview_state_.anchor_workspace_idx =
+        monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx;
+    overview_state_.selected_workspace_idx = overview_state_.anchor_workspace_idx;
+    overview_state_.previous_workspace_idx = overview_state_.anchor_workspace_idx;
+    overview_state_.selected_client.reset();
+    overview_state_.previous_focused_client.reset();
+
+    auto& ws = current_workspace();
+    if (auto* focused = ws.focused_client(); focused != nullptr) {
+      overview_state_.selected_client = focused->window;
+      overview_state_.previous_focused_client = focused->window;
+    }
+
+    normalize_overview_after_workspace_change();
+    relayout();
+    return;
+  }
+
+  overview_state_.active = false;
+  const int restore_workspace = overview_state_.previous_workspace_idx.value_or(
+      monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx);
+  switch_workspace(restore_workspace);
+  if (overview_state_.previous_focused_client.has_value()) {
+    focus_window(*overview_state_.previous_focused_client);
+  }
+
+  for (size_t ws_idx = 0; ws_idx < workspaces_.size(); ++ws_idx) {
+    if (static_cast<int>(ws_idx) == monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx) {
+      continue;
+    }
+    for (const auto& client : workspaces_[ws_idx].clients()) {
+      xcb_unmap_window(connection_.raw(), client.window);
+    }
+  }
+
+  relayout();
+}
+
+void WM::activate_overview_selection() {
+  if (!overview_state_.active) {
+    return;
+  }
+
+  if (overview_state_.selected_workspace_idx.has_value()) {
+    monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx = *overview_state_.selected_workspace_idx;
+  }
+  const auto client = overview_state_.selected_client;
+  overview_state_.active = false;
+
+  for (size_t ws_idx = 0; ws_idx < workspaces_.size(); ++ws_idx) {
+    if (static_cast<int>(ws_idx) == monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx) {
+      continue;
+    }
+    for (const auto& hidden : workspaces_[ws_idx].clients()) {
+      xcb_unmap_window(connection_.raw(), hidden.window);
+    }
+  }
+
+  if (client.has_value()) {
+    focus_window(*client);
+  }
+  set_desktop_properties();
+  relayout();
+}
+
+void WM::move_overview_selection(int delta) {
+  if (!overview_state_.active || delta == 0) {
+    return;
+  }
+
+  std::vector<std::pair<int, xcb_window_t>> ordered_clients;
+  for (const auto& ws : workspaces_) {
+    for (const auto& client : ws.clients()) {
+      ordered_clients.emplace_back(ws.index(), client.window);
+    }
+  }
+
+  if (ordered_clients.empty()) {
+    normalize_overview_after_workspace_change();
+    return;
+  }
+
+  size_t selected_idx = 0;
+  if (overview_state_.selected_client.has_value()) {
+    for (size_t i = 0; i < ordered_clients.size(); ++i) {
+      if (ordered_clients[i].second == *overview_state_.selected_client) {
+        selected_idx = i;
+        break;
+      }
+    }
+  }
+
+  const int size = static_cast<int>(ordered_clients.size());
+  int next = static_cast<int>(selected_idx) + delta;
+  while (next < 0) {
+    next += size;
+  }
+  next %= size;
+
+  overview_state_.selected_workspace_idx = ordered_clients[static_cast<size_t>(next)].first;
+  overview_state_.selected_client = ordered_clients[static_cast<size_t>(next)].second;
+}
+
+void WM::select_overview_workspace(int idx) {
+  if (!overview_state_.active || idx < 0 || idx >= static_cast<int>(workspaces_.size())) {
+    return;
+  }
+
+  overview_state_.selected_workspace_idx = idx;
+  const auto& ws = workspaces_[static_cast<size_t>(idx)];
+  if (auto* focused = ws.focused_client(); focused != nullptr) {
+    overview_state_.selected_client = focused->window;
+  } else if (!ws.clients().empty()) {
+    overview_state_.selected_client = ws.clients().front().window;
+  } else {
+    overview_state_.selected_client.reset();
+  }
+
+  relayout();
+}
+
+void WM::normalize_overview_after_workspace_change() {
+  overview::normalize_overview_state(overview_state_, workspaces_);
+  if (!overview_state_.active) {
+    return;
+  }
+
+  if (overview_state_.selected_workspace_idx.has_value()) {
+    monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx = *overview_state_.selected_workspace_idx;
+  }
+}
+
 void WM::relayout() {
+  if (overview_state_.active) {
+    normalize_overview_after_workspace_change();
+
+    const int screen_w = static_cast<int>(connection_.screen()->width_in_pixels);
+    const int screen_h = static_cast<int>(connection_.screen()->height_in_pixels);
+    const int workspace_gap = std::max(0, config_.outer_padding * 2);
+
+    const auto scene = overview::compute_workspace_scene_offsets(
+        workspaces_, overview_state_.anchor_workspace_idx, screen_w, screen_h, workspace_gap);
+    const auto camera = overview::build_overview_camera(scene, overview_state_.anchor_workspace_idx,
+                                                        screen_w, screen_h);
+    overview_state_.zoom_factor = camera.scale;
+
+    std::vector<int> offsets;
+    offsets.reserve(workspaces_.size());
+    for (const auto& ws : workspaces_) {
+      offsets.push_back(ws.scroll_offset());
+    }
+
+    const auto render_rects = overview::build_overview_render_rects(
+        workspaces_, offsets, layout_engine_, camera, scene, screen_w, screen_h,
+        config_.gap, config_.border_width, config_.outer_padding);
+
+    for (auto& ws : workspaces_) {
+      for (const auto& client : ws.clients()) {
+        xcb_map_window(connection_.raw(), client.window);
+      }
+    }
+
+    for (const auto& rr : render_rects) {
+      if (!rr.client.has_value()) {
+        continue;
+      }
+      uint32_t border = static_cast<uint32_t>(config_.border_width);
+      if (overview_state_.selected_client.has_value() && *overview_state_.selected_client == *rr.client) {
+        border = static_cast<uint32_t>(config_.border_width + 2);
+      } else if (overview_state_.selected_workspace_idx.has_value() &&
+                 *overview_state_.selected_workspace_idx == rr.workspace_idx) {
+        border = static_cast<uint32_t>(config_.border_width + 1);
+      }
+
+      const uint32_t vals[] = {
+          static_cast<uint32_t>(std::max(0, rr.rect.x)),
+          static_cast<uint32_t>(std::max(0, rr.rect.y)),
+          static_cast<uint32_t>(std::max(1, rr.rect.width)),
+          static_cast<uint32_t>(std::max(1, rr.rect.height)),
+          border,
+      };
+      xcb_configure_window(connection_.raw(), *rr.client,
+                           XCB_CONFIG_WINDOW_X |
+                               XCB_CONFIG_WINDOW_Y |
+                               XCB_CONFIG_WINDOW_WIDTH |
+                               XCB_CONFIG_WINDOW_HEIGHT |
+                               XCB_CONFIG_WINDOW_BORDER_WIDTH,
+                           vals);
+    }
+
+    if (overview_state_.selected_client.has_value()) {
+      focus_window(*overview_state_.selected_client);
+    }
+    return;
+  }
+
   auto& ws = current_workspace();
 
   const auto fullscreen_client = std::find_if(

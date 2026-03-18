@@ -9,6 +9,7 @@
 #include "config/config.hpp"
 #include "layout/scroll_layout.hpp"
 #include "model/workspace.hpp"
+#include "overview/overview.hpp"
 
 namespace {
 
@@ -498,6 +499,124 @@ bool test_layout_focus_centering_and_direction_toggle() {
   return horizontal_focus_ok && centered_ok && direction_change_ok;
 }
 
+
+
+bool test_config_toggle_overview_binding_parses() {
+  return with_temp_config(
+      "scrollwm-config-overview-binding.toml",
+      "[bindings]\n"
+      "toggle_overview = \"Mod+Tab\"\n"
+      "activate_overview = \"Return\"\n",
+      [](const Config& cfg) {
+        return expect(cfg.bindings.toggle_overview == "Mod+Tab", "toggle_overview should parse") &&
+               expect(cfg.bindings.activate_overview == "Return", "activate_overview should parse") &&
+               expect(cfg.bindings.focus_next == "Mod+J", "existing defaults should remain intact");
+      });
+}
+
+bool test_overview_state_toggle_and_normalization() {
+  using scrollwm::overview::OverviewState;
+  OverviewState state;
+  state.active = true;
+  state.anchor_workspace_idx = 5;
+  state.selected_workspace_idx = 5;
+  state.selected_client = 999;
+
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {10}));
+  workspaces.push_back(make_workspace_with_clients(1, {20}));
+
+  scrollwm::overview::normalize_overview_state(state, workspaces);
+  const bool normalized = expect(state.active, "overview should remain active with valid workspaces") &&
+                          expect(state.anchor_workspace_idx == 1, "anchor should clamp to valid range") &&
+                          expect(state.selected_workspace_idx.has_value() && *state.selected_workspace_idx == 1,
+                                 "selected workspace should clamp") &&
+                          expect(state.selected_client.has_value() && *state.selected_client == 20,
+                                 "selected client should renormalize to workspace client");
+
+  state.active = true;
+  state.selected_workspace_idx = 0;
+  state.selected_client = 10;
+  workspaces.clear();
+  scrollwm::overview::normalize_overview_state(state, workspaces);
+  const bool empty_safe = expect(!state.active, "overview should deactivate safely when no workspaces exist") &&
+                          expect(!state.selected_workspace_idx.has_value(),
+                                 "selected workspace should clear with no workspaces");
+
+  return normalized && empty_safe;
+}
+
+bool test_overview_workspace_scene_offsets_non_overlapping() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {1}));
+  workspaces.push_back(make_workspace_with_clients(1, {2}));
+  workspaces.push_back(make_workspace_with_clients(2, {3}));
+
+  const auto scene = scrollwm::overview::compute_workspace_scene_offsets(workspaces, 1, 1920, 1080, 240);
+  return expect(scene.size() == 3, "scene should include all workspaces") &&
+         expect(scene[0].origin_x < scene[1].origin_x && scene[1].origin_x < scene[2].origin_x,
+                "workspace offsets should be distinct and ordered") &&
+         expect(scene[1].origin_x == 0, "anchor workspace should be centered at world origin");
+}
+
+bool test_overview_transform_bounds_and_anchor_behavior() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {1}));
+  workspaces.push_back(make_workspace_with_clients(1, {2}));
+  workspaces.push_back(make_workspace_with_clients(2, {3}));
+
+  const auto scene = scrollwm::overview::compute_workspace_scene_offsets(workspaces, 1, 1200, 700, 120);
+  const auto camera = scrollwm::overview::build_overview_camera(scene, 1, 1200, 700);
+
+  const auto anchor_rect = scrollwm::overview::apply_overview_transform(scene[1].workspace_bounds, camera);
+  const int anchor_center_x = anchor_rect.x + (anchor_rect.width / 2);
+  const int viewport_center_x = 1200 / 2;
+
+  bool bounds_ok = true;
+  for (const auto& entry : scene) {
+    const auto rect = scrollwm::overview::apply_overview_transform(entry.workspace_bounds, camera);
+    bounds_ok = bounds_ok && rect.x >= 0 && rect.y >= 0 &&
+                rect.x + rect.width <= 1200 && rect.y + rect.height <= 700;
+  }
+
+  return expect(bounds_ok, "transformed workspace bounds should stay on-screen") &&
+         expect(std::abs(anchor_center_x - viewport_center_x) <= 2,
+                "anchor workspace should remain centered in overview camera");
+}
+
+bool test_overview_render_rect_association_and_selection_target() {
+  Workspace a(0);
+  a.add_client({.window = 11});
+  Workspace b(1);
+  b.add_client({.window = 21});
+  b.add_client({.window = 22});
+
+  std::vector<Workspace> workspaces = {a, b};
+  std::vector<int> offsets = {0, 0};
+  scrollwm::layout::ScrollLayout layout(Direction::Horizontal);
+  const auto scene = scrollwm::overview::compute_workspace_scene_offsets(workspaces, 0, 1000, 700, 100);
+  const auto camera = scrollwm::overview::build_overview_camera(scene, 0, 1000, 700);
+  const auto rects = scrollwm::overview::build_overview_render_rects(
+      workspaces, offsets, layout, camera, scene, 1000, 700, 12, 2, 12);
+
+  bool found_ws0 = false;
+  bool found_ws1_client22 = false;
+  for (const auto& rr : rects) {
+    if (!rr.client.has_value()) {
+      continue;
+    }
+    if (rr.workspace_idx == 0 && *rr.client == 11) {
+      found_ws0 = true;
+    }
+    if (rr.workspace_idx == 1 && *rr.client == 22) {
+      found_ws1_client22 = true;
+    }
+  }
+
+  return expect(found_ws0, "workspace association should be preserved for ws0 window") &&
+         expect(found_ws1_client22, "workspace association should be preserved for ws1 window");
+}
+
 }  // namespace
 
 int main() {
@@ -508,6 +627,7 @@ int main() {
       {"config exec malformed ignored", test_config_exec_malformed_entries_ignored},
       {"config exec whitespace/comments/unknowns", test_config_exec_whitespace_comments_unknown_sections},
       {"config clamps", test_config_clamps_workspace_and_schema_versions},
+      {"config toggle overview binding", test_config_toggle_overview_binding_parses},
       {"workspace remove middle focused", test_workspace_remove_middle_focused_behavior},
       {"workspace remove only", test_workspace_remove_only_client_clears_focus},
       {"workspace reorder boundaries", test_workspace_reorder_boundaries_and_wrap_behavior},
@@ -527,6 +647,10 @@ int main() {
       {"layout focus offset", test_layout_offset_tracks_focus_changes},
       {"layout gap border padding", test_layout_gap_border_padding_influence_geometry},
       {"layout focus centering + direction", test_layout_focus_centering_and_direction_toggle},
+      {"overview state normalization", test_overview_state_toggle_and_normalization},
+      {"overview workspace scene offsets", test_overview_workspace_scene_offsets_non_overlapping},
+      {"overview transform bounds + anchor", test_overview_transform_bounds_and_anchor_behavior},
+      {"overview render rect associations", test_overview_render_rect_association_and_selection_target},
   };
 
   for (const auto& [name, test] : tests) {
