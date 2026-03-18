@@ -10,6 +10,7 @@
 - [x] TOML-like config loading from `~/.config/scrollwm/config.toml`
 - [x] Session integration for display managers via `xsessions` desktop entry
 - [x] Session wrapper that can optionally start picom
+- [x] Basic unit tests for config/layout/workspace logic
 
 ## M1 - Desktop usability hardening
 - [ ] Improve ICCCM/EWMH coverage (`_NET_SUPPORTED`, `_NET_WM_STATE`, desktop names)

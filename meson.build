@@ -8,7 +8,6 @@ project('scrollwm', 'cpp',
   ]
 )
 
-cpp = meson.get_compiler('cpp')
 add_project_arguments([
   '-Wall',
   '-Wextra',
@@ -24,6 +23,11 @@ xcb_dep = dependency('xcb', required: true)
 xcb_keysyms_dep = dependency('xcb-keysyms', required: true)
 xcb_icccm_dep = dependency('xcb-icccm', required: false)
 
+deps = [xcb_dep, xcb_keysyms_dep]
+if xcb_icccm_dep.found()
+  deps += xcb_icccm_dep
+endif
+
 scrollwm_sources = files(
   'src/main.cpp',
   'src/wm.cpp',
@@ -37,17 +41,25 @@ scrollwm_sources = files(
   'src/util/log.cpp',
 )
 
-deps = [xcb_dep, xcb_keysyms_dep]
-if xcb_icccm_dep.found()
-  deps += xcb_icccm_dep
-endif
-
 executable('scrollwm',
   scrollwm_sources,
   include_directories: inc,
   dependencies: deps,
   install: true,
 )
+
+scrollwm_unit_tests = executable('scrollwm-unit-tests',
+  files(
+    'tests/unit_tests.cpp',
+    'src/layout/scroll_layout.cpp',
+    'src/model/workspace.cpp',
+    'src/model/client.cpp',
+    'src/config/config.cpp',
+  ),
+  include_directories: inc,
+  dependencies: [xcb_dep],
+)
+test('scrollwm-unit-tests', scrollwm_unit_tests)
 
 install_data('assets/xsessions/scrollwm.desktop',
   install_dir: join_paths(get_option('datadir'), 'xsessions')

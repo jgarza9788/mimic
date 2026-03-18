@@ -34,6 +34,19 @@ meson setup build
 meson compile -C build
 ```
 
+## One-shot bootstrap (install deps, build, install, test)
+
+A helper script is provided for common Linux distributions:
+
+```bash
+./scripts/bootstrap-build-install-test.sh
+```
+
+Environment overrides:
+
+- `PREFIX` (default `/usr/local`)
+- `BUILD_DIR` (default `build`)
+
 ## Install
 
 ```bash
@@ -101,6 +114,14 @@ Configuration sections currently parsed:
 - `[autostart]`: `launch_picom`, `compositor`
 
 See [`config/config.toml.example`](config/config.toml.example).
+
+## Testing
+
+Run unit tests after building:
+
+```bash
+meson test -C build --print-errorlogs
+```
 
 ## Development roadmap
 
