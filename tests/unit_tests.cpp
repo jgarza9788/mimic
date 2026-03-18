@@ -38,6 +38,19 @@ bool test_workspace_focus_cycle() {
     return false;
   }
 
+  ws.reorder_focused_backward();
+  if (!ws.focused_index().has_value() || *ws.focused_index() != 0) {
+    std::cerr << "reorder backward should move focus to previous index\n";
+    return false;
+  }
+
+  ws.clients()[1].urgent = true;
+  ws.focus_urgent();
+  if (!ws.focused_index().has_value() || *ws.focused_index() != 1) {
+    std::cerr << "focus_urgent should jump to urgent client\n";
+    return false;
+  }
+
   return true;
 }
 
@@ -66,6 +79,14 @@ bool test_scroll_layout_focus_centering() {
   const int viewport_center = 1920 / 2;
   if (std::abs(focused_center - viewport_center) > 300) {
     std::cerr << "focused window should be kept near viewport center\n";
+    return false;
+  }
+
+  layout.set_direction(scrollwm::config::Direction::Vertical);
+  offset = 0;
+  const auto vertical_rects = layout.compute(ws, 1920, 1080, 12, 2, 12, offset);
+  if (vertical_rects.size() != 3 || vertical_rects[0].x == rects[0].x) {
+    std::cerr << "direction toggle should affect computed geometry\n";
     return false;
   }
 
@@ -121,6 +142,14 @@ bool test_config_parse() {
 
   if (cfg.bindings.workspace_1 != "Mod+F1" || cfg.bindings.move_to_workspace_1 != "Mod+Shift+F1") {
     std::cerr << "bindings parse mismatch\n";
+    return false;
+  }
+
+  if (cfg.bindings.toggle_layout_direction != "Mod+Space" ||
+      cfg.bindings.reorder_next != "Mod+Shift+J" ||
+      cfg.bindings.reorder_prev != "Mod+Shift+K" ||
+      cfg.bindings.toggle_fullscreen != "Mod+F") {
+    std::cerr << "new bindings should preserve defaults when unspecified\n";
     return false;
   }
 

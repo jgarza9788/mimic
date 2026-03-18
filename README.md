@@ -96,6 +96,9 @@ exec scrollwm-session
 - `Mod+1..4`: switch workspace
 - `Mod+q`: close focused window (WM_DELETE_WINDOW)
 - `Mod+Shift+e`: exit ScrollWM
+- `Mod+Space`: toggle layout direction (horizontal/vertical) at runtime
+- `Mod+Shift+j` / `Mod+Shift+k`: reorder focused window in scroll order
+- `Mod+f`: toggle fullscreen on focused tiled window (with restore)
 
 ## Config
 

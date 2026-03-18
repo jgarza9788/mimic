@@ -17,6 +17,8 @@ struct Rect {
 class ScrollLayout {
  public:
   explicit ScrollLayout(config::Direction direction);
+  void set_direction(config::Direction direction);
+  config::Direction direction() const;
 
   std::vector<Rect> compute(const model::Workspace& workspace,
                             int screen_width,

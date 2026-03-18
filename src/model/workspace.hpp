@@ -22,6 +22,10 @@ class Workspace {
   void focus_index(size_t idx);
   void focus_next();
   void focus_prev();
+  void focus_urgent();
+  void note_focus(xcb_window_t window);
+  void reorder_focused_forward();
+  void reorder_focused_backward();
 
   Client* focused_client();
   const Client* focused_client() const;
@@ -34,6 +38,7 @@ class Workspace {
   std::vector<Client> clients_;
   std::optional<size_t> focused_index_;
   int scroll_offset_ = 0;
+  std::vector<xcb_window_t> focus_history_;
 };
 
 }  // namespace scrollwm::model

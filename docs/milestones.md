@@ -20,11 +20,11 @@
 - [x] Configurable keybinding parser from TOML
 
 ## M2 - Layout and multi-monitor evolution
-- [ ] Per-monitor workspace/view model
-- [ ] Vertical + horizontal scrolling modes with runtime toggle
-- [ ] Window reorder shortcuts
-- [ ] Fullscreen semantics and restore behavior
-- [ ] Better focus history and urgent window handling
+- [x] Per-monitor workspace/view model
+- [x] Vertical + horizontal scrolling modes with runtime toggle
+- [x] Window reorder shortcuts
+- [x] Fullscreen semantics and restore behavior
+- [x] Better focus history and urgent window handling
 
 ## M3 - Packaging and ops
 - [ ] man page (`scrollwm(1)`)
