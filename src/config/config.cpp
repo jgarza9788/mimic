@@ -75,7 +75,7 @@ Config load_from_path(const std::filesystem::path& path) {
   while (std::getline(file, line)) {
     const auto comment_pos = line.find('#');
     if (comment_pos != std::string::npos) {
-      line = line.substr(0, comment_pos);
+      line.erase(comment_pos);
     }
     line = trim(line);
     if (line.empty()) {

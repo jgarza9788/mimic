@@ -418,12 +418,11 @@ void WM::handle_client_message(const xcb_client_message_event_t& event) {
   if (event.type == atoms_.net_wm_state) {
     auto& ws = current_workspace();
     if (auto idx = find_client_index(ws, event.window); idx.has_value()) {
-      auto& client = ws.clients()[*idx];
       const bool fullscreen_request =
           event.data.data32[1] == atoms_.net_wm_state_fullscreen ||
           event.data.data32[2] == atoms_.net_wm_state_fullscreen;
       if (fullscreen_request) {
-        set_fullscreen(client, event.data.data32[0] != 0);
+        set_fullscreen(ws.clients()[*idx], event.data.data32[0] != 0);
         relayout();
       }
     }
@@ -643,25 +642,25 @@ void WM::kill_focused() {
 void WM::relayout() {
   auto& ws = current_workspace();
 
-  for (auto& client : ws.clients()) {
-    if (client.fullscreen) {
-      const uint32_t vals[] = {
-          0,
-          0,
-          static_cast<uint32_t>(connection_.screen()->width_in_pixels),
-          static_cast<uint32_t>(connection_.screen()->height_in_pixels),
-          0,
-      };
-      xcb_configure_window(connection_.raw(), client.window,
-                           XCB_CONFIG_WINDOW_X |
-                               XCB_CONFIG_WINDOW_Y |
-                               XCB_CONFIG_WINDOW_WIDTH |
-                               XCB_CONFIG_WINDOW_HEIGHT |
-                               XCB_CONFIG_WINDOW_BORDER_WIDTH,
-                           vals);
-      focus_window(client.window);
-      return;
-    }
+  const auto fullscreen_client = std::find_if(
+      ws.clients().begin(), ws.clients().end(), [](const auto& client) { return client.fullscreen; });
+  if (fullscreen_client != ws.clients().end()) {
+    const uint32_t vals[] = {
+        0,
+        0,
+        static_cast<uint32_t>(connection_.screen()->width_in_pixels),
+        static_cast<uint32_t>(connection_.screen()->height_in_pixels),
+        0,
+    };
+    xcb_configure_window(connection_.raw(), fullscreen_client->window,
+                         XCB_CONFIG_WINDOW_X |
+                             XCB_CONFIG_WINDOW_Y |
+                             XCB_CONFIG_WINDOW_WIDTH |
+                             XCB_CONFIG_WINDOW_HEIGHT |
+                             XCB_CONFIG_WINDOW_BORDER_WIDTH,
+                         vals);
+    focus_window(fullscreen_client->window);
+    return;
   }
 
   int offset = ws.scroll_offset();
@@ -732,9 +731,8 @@ std::optional<size_t> WM::find_client_index(const model::Workspace& workspace, x
 void WM::set_client_list_property() {
   std::vector<xcb_window_t> all_windows;
   for (const auto& ws : workspaces_) {
-    for (const auto& client : ws.clients()) {
-      all_windows.push_back(client.window);
-    }
+    std::transform(ws.clients().begin(), ws.clients().end(), std::back_inserter(all_windows),
+                   [](const auto& client) { return client.window; });
   }
 
   xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, connection_.screen()->root,
