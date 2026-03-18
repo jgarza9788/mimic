@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <unordered_set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -39,12 +40,26 @@ class WM {
       MoveToWorkspace2,
       MoveToWorkspace3,
       MoveToWorkspace4,
+      ToggleLayoutDirection,
+      ReorderNext,
+      ReorderPrev,
+      ToggleFullscreen,
     } action;
   };
 
   struct SizeConstraints {
     uint32_t min_width = 0;
     uint32_t min_height = 0;
+  };
+  struct SavedGeometry {
+    int16_t x = 0;
+    int16_t y = 0;
+    uint16_t width = 0;
+    uint16_t height = 0;
+    bool valid = false;
+  };
+  struct MonitorView {
+    int workspace_idx = 0;
   };
 
   bool setup();
@@ -61,6 +76,7 @@ class WM {
   void handle_enter_notify(const xcb_enter_notify_event_t& event);
   void handle_key_press(const xcb_key_press_event_t& event);
   void handle_client_message(const xcb_client_message_event_t& event);
+  void handle_property_notify(const xcb_property_notify_event_t& event);
 
   void manage_existing_windows();
   void add_client(xcb_window_t window);
@@ -71,8 +87,16 @@ class WM {
   void focus_prev();
   void switch_workspace(int idx);
   void move_focused_to_workspace(int idx);
+  void reorder_focused_forward();
+  void reorder_focused_backward();
+  void toggle_layout_direction();
+  void toggle_focused_fullscreen();
   void kill_focused();
   void update_window_state_property(const model::Client& client);
+  void clear_urgency(xcb_window_t window);
+  bool query_window_urgent(xcb_window_t window) const;
+  SavedGeometry query_geometry(xcb_window_t window) const;
+  void set_fullscreen(model::Client& client, bool enabled);
   bool is_dialog_window(xcb_window_t window) const;
   bool is_transient_window(xcb_window_t window) const;
   SizeConstraints query_size_constraints(xcb_window_t window) const;
@@ -96,10 +120,12 @@ class WM {
   config::Config config_;
   layout::ScrollLayout layout_engine_;
   std::vector<model::Workspace> workspaces_;
-  int current_workspace_idx_ = 0;
+  std::vector<MonitorView> monitors_;
+  int active_monitor_idx_ = 0;
 
   std::vector<KeyBinding> bindings_;
   std::unordered_map<xcb_window_t, SizeConstraints> size_constraints_;
+  std::unordered_map<xcb_window_t, SavedGeometry> saved_geometry_;
 };
 
 }  // namespace scrollwm

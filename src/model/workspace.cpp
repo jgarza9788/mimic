@@ -1,5 +1,7 @@
 #include "model/workspace.hpp"
 
+#include <algorithm>
+
 namespace scrollwm::model {
 
 Workspace::Workspace(int index) : index_(index) {}
@@ -13,17 +15,29 @@ const std::vector<Client>& Workspace::clients() const { return clients_; }
 void Workspace::add_client(Client client) {
   clients_.push_back(client);
   focused_index_ = clients_.size() - 1;
+  note_focus(client.window);
 }
 
 void Workspace::remove_client(xcb_window_t window) {
   for (size_t i = 0; i < clients_.size(); ++i) {
     if (clients_[i].window == window) {
       clients_.erase(clients_.begin() + static_cast<std::ptrdiff_t>(i));
+      focus_history_.erase(std::remove(focus_history_.begin(), focus_history_.end(), window), focus_history_.end());
       if (clients_.empty()) {
         focused_index_.reset();
       } else if (focused_index_.has_value()) {
         if (*focused_index_ >= clients_.size()) {
           focused_index_ = clients_.size() - 1;
+        }
+      }
+      if (!clients_.empty()) {
+        for (auto it = focus_history_.rbegin(); it != focus_history_.rend(); ++it) {
+          for (size_t j = 0; j < clients_.size(); ++j) {
+            if (clients_[j].window == *it) {
+              focused_index_ = j;
+              return;
+            }
+          }
         }
       }
       return;
@@ -36,6 +50,7 @@ std::optional<size_t> Workspace::focused_index() const { return focused_index_; 
 void Workspace::focus_index(size_t idx) {
   if (idx < clients_.size()) {
     focused_index_ = idx;
+    note_focus(clients_[idx].window);
   }
 }
 
@@ -49,6 +64,7 @@ void Workspace::focus_next() {
     return;
   }
   focused_index_ = (*focused_index_ + 1) % clients_.size();
+  note_focus(clients_[*focused_index_].window);
 }
 
 void Workspace::focus_prev() {
@@ -66,6 +82,46 @@ void Workspace::focus_prev() {
   } else {
     focused_index_ = *focused_index_ - 1;
   }
+  note_focus(clients_[*focused_index_].window);
+}
+
+void Workspace::focus_urgent() {
+  for (size_t i = 0; i < clients_.size(); ++i) {
+    if (clients_[i].urgent) {
+      focused_index_ = i;
+      note_focus(clients_[i].window);
+      return;
+    }
+  }
+}
+
+void Workspace::note_focus(xcb_window_t window) {
+  focus_history_.erase(std::remove(focus_history_.begin(), focus_history_.end(), window), focus_history_.end());
+  focus_history_.push_back(window);
+}
+
+void Workspace::reorder_focused_forward() {
+  if (!focused_index_.has_value() || clients_.empty()) {
+    return;
+  }
+  const size_t idx = *focused_index_;
+  if (idx + 1 >= clients_.size()) {
+    return;
+  }
+  std::swap(clients_[idx], clients_[idx + 1]);
+  focused_index_ = idx + 1;
+}
+
+void Workspace::reorder_focused_backward() {
+  if (!focused_index_.has_value() || clients_.empty()) {
+    return;
+  }
+  const size_t idx = *focused_index_;
+  if (idx == 0) {
+    return;
+  }
+  std::swap(clients_[idx], clients_[idx - 1]);
+  focused_index_ = idx - 1;
 }
 
 Client* Workspace::focused_client() {

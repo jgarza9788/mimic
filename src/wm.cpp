@@ -98,6 +98,7 @@ WM::WM()
   if (workspaces_.empty()) {
     workspaces_.emplace_back(0);
   }
+  monitors_.push_back(MonitorView{.workspace_idx = 0});
 }
 
 int WM::run() {
@@ -205,6 +206,10 @@ void WM::setup_keys() {
   add_binding(config_.bindings.move_to_workspace_2, KeyBinding::Action::MoveToWorkspace2);
   add_binding(config_.bindings.move_to_workspace_3, KeyBinding::Action::MoveToWorkspace3);
   add_binding(config_.bindings.move_to_workspace_4, KeyBinding::Action::MoveToWorkspace4);
+  add_binding(config_.bindings.toggle_layout_direction, KeyBinding::Action::ToggleLayoutDirection);
+  add_binding(config_.bindings.reorder_next, KeyBinding::Action::ReorderNext);
+  add_binding(config_.bindings.reorder_prev, KeyBinding::Action::ReorderPrev);
+  add_binding(config_.bindings.toggle_fullscreen, KeyBinding::Action::ToggleFullscreen);
 
   for (const auto& binding : bindings_) {
     xcb_keycode_t* keycodes = xcb_key_symbols_get_keycode(key_symbols_, binding.keysym);
@@ -257,6 +262,9 @@ void WM::handle_event(xcb_generic_event_t* event) {
       break;
     case XCB_CLIENT_MESSAGE:
       handle_client_message(*reinterpret_cast<xcb_client_message_event_t*>(event));
+      break;
+    case XCB_PROPERTY_NOTIFY:
+      handle_property_notify(*reinterpret_cast<xcb_property_notify_event_t*>(event));
       break;
     default:
       break;
@@ -360,6 +368,18 @@ void WM::handle_key_press(const xcb_key_press_event_t& event) {
       case KeyBinding::Action::MoveToWorkspace4:
         move_focused_to_workspace(3);
         break;
+      case KeyBinding::Action::ToggleLayoutDirection:
+        toggle_layout_direction();
+        break;
+      case KeyBinding::Action::ReorderNext:
+        reorder_focused_forward();
+        break;
+      case KeyBinding::Action::ReorderPrev:
+        reorder_focused_backward();
+        break;
+      case KeyBinding::Action::ToggleFullscreen:
+        toggle_focused_fullscreen();
+        break;
     }
     return;
   }
@@ -402,10 +422,22 @@ void WM::handle_client_message(const xcb_client_message_event_t& event) {
           event.data.data32[1] == atoms_.net_wm_state_fullscreen ||
           event.data.data32[2] == atoms_.net_wm_state_fullscreen;
       if (fullscreen_request) {
-        client.fullscreen = event.data.data32[0] != 0;
-        update_window_state_property(client);
+        set_fullscreen(client, event.data.data32[0] != 0);
         relayout();
       }
+    }
+  }
+}
+
+void WM::handle_property_notify(const xcb_property_notify_event_t& event) {
+  if (event.atom != XCB_ATOM_WM_HINTS) {
+    return;
+  }
+
+  for (auto& ws : workspaces_) {
+    if (auto idx = find_client_index(ws, event.window); idx.has_value()) {
+      ws.clients()[*idx].urgent = query_window_urgent(event.window);
+      return;
     }
   }
 }
@@ -451,8 +483,8 @@ void WM::add_client(xcb_window_t window) {
   xcb_change_window_attributes(connection_.raw(), window, XCB_CW_EVENT_MASK, values);
   xcb_configure_window(connection_.raw(), window, XCB_CONFIG_WINDOW_BORDER_WIDTH, &values[1]);
 
-  ws.add_client(model::Client{.window = window, .floating = floating});
-  const uint32_t desktop = static_cast<uint32_t>(current_workspace_idx_);
+  ws.add_client(model::Client{.window = window, .floating = floating, .urgent = query_window_urgent(window)});
+  const uint32_t desktop = static_cast<uint32_t>(monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx);
   xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, window,
                       atoms_.net_wm_desktop, XCB_ATOM_CARDINAL, 32, 1, &desktop);
   size_constraints_[window] = hints;
@@ -474,6 +506,7 @@ void WM::add_client(xcb_window_t window) {
 
 void WM::remove_client(xcb_window_t window) {
   size_constraints_.erase(window);
+  saved_geometry_.erase(window);
   for (auto& ws : workspaces_) {
     ws.remove_client(window);
   }
@@ -482,6 +515,13 @@ void WM::remove_client(xcb_window_t window) {
 }
 
 void WM::focus_window(xcb_window_t window) {
+  clear_urgency(window);
+  for (auto& ws : workspaces_) {
+    if (auto idx = find_client_index(ws, window); idx.has_value()) {
+      ws.focus_index(*idx);
+      break;
+    }
+  }
   xcb_set_input_focus(connection_.raw(), XCB_INPUT_FOCUS_POINTER_ROOT, window, XCB_CURRENT_TIME);
   xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, connection_.screen()->root,
                       atoms_.net_active_window, XCB_ATOM_WINDOW, 32, 1, &window);
@@ -489,6 +529,7 @@ void WM::focus_window(xcb_window_t window) {
 
 void WM::focus_next() {
   auto& ws = current_workspace();
+  ws.focus_urgent();
   ws.focus_next();
   if (auto* client = ws.focused_client(); client != nullptr) {
     focus_window(client->window);
@@ -498,6 +539,7 @@ void WM::focus_next() {
 
 void WM::focus_prev() {
   auto& ws = current_workspace();
+  ws.focus_urgent();
   ws.focus_prev();
   if (auto* client = ws.focused_client(); client != nullptr) {
     focus_window(client->window);
@@ -506,7 +548,8 @@ void WM::focus_prev() {
 }
 
 void WM::switch_workspace(int idx) {
-  if (idx < 0 || idx >= static_cast<int>(workspaces_.size()) || idx == current_workspace_idx_) {
+  auto& monitor = monitors_[static_cast<size_t>(active_monitor_idx_)];
+  if (idx < 0 || idx >= static_cast<int>(workspaces_.size()) || idx == monitor.workspace_idx) {
     return;
   }
 
@@ -514,7 +557,7 @@ void WM::switch_workspace(int idx) {
     xcb_unmap_window(connection_.raw(), client.window);
   }
 
-  current_workspace_idx_ = idx;
+  monitor.workspace_idx = idx;
   for (const auto& client : current_workspace().clients()) {
     xcb_map_window(connection_.raw(), client.window);
   }
@@ -524,7 +567,9 @@ void WM::switch_workspace(int idx) {
 }
 
 void WM::move_focused_to_workspace(int idx) {
-  if (idx < 0 || idx >= static_cast<int>(workspaces_.size()) || idx == current_workspace_idx_) {
+  const int current_workspace_idx =
+      monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx;
+  if (idx < 0 || idx >= static_cast<int>(workspaces_.size()) || idx == current_workspace_idx) {
     return;
   }
 
@@ -542,6 +587,35 @@ void WM::move_focused_to_workspace(int idx) {
                       atoms_.net_wm_desktop, XCB_ATOM_CARDINAL, 32, 1, &desktop);
   xcb_unmap_window(connection_.raw(), moved.window);
   set_client_list_property();
+  relayout();
+}
+
+void WM::reorder_focused_forward() {
+  auto& ws = current_workspace();
+  ws.reorder_focused_forward();
+  relayout();
+}
+
+void WM::reorder_focused_backward() {
+  auto& ws = current_workspace();
+  ws.reorder_focused_backward();
+  relayout();
+}
+
+void WM::toggle_layout_direction() {
+  const auto direction = layout_engine_.direction();
+  const auto next = direction == config::Direction::Horizontal ? config::Direction::Vertical
+                                                               : config::Direction::Horizontal;
+  layout_engine_.set_direction(next);
+  relayout();
+}
+
+void WM::toggle_focused_fullscreen() {
+  auto* client = current_workspace().focused_client();
+  if (client == nullptr || client->floating) {
+    return;
+  }
+  set_fullscreen(*client, !client->fullscreen);
   relayout();
 }
 
@@ -632,10 +706,14 @@ void WM::relayout() {
   }
 }
 
-model::Workspace& WM::current_workspace() { return workspaces_[static_cast<size_t>(current_workspace_idx_)]; }
+model::Workspace& WM::current_workspace() {
+  const int workspace_idx = monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx;
+  return workspaces_[static_cast<size_t>(workspace_idx)];
+}
 
 const model::Workspace& WM::current_workspace() const {
-  return workspaces_[static_cast<size_t>(current_workspace_idx_)];
+  const int workspace_idx = monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx;
+  return workspaces_[static_cast<size_t>(workspace_idx)];
 }
 
 std::optional<size_t> WM::find_client_index(const model::Workspace& workspace, xcb_window_t window) const {
@@ -663,7 +741,8 @@ void WM::set_client_list_property() {
 
 void WM::set_desktop_properties() {
   const uint32_t desktop_count = static_cast<uint32_t>(workspaces_.size());
-  const uint32_t current_desktop = static_cast<uint32_t>(current_workspace_idx_);
+  const uint32_t current_desktop = static_cast<uint32_t>(
+      monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx);
 
   xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, connection_.screen()->root,
                       atoms_.net_number_of_desktops, XCB_ATOM_CARDINAL, 32, 1,
@@ -705,6 +784,93 @@ void WM::update_window_state_property(const model::Client& client) {
   }
 
   xcb_delete_property(connection_.raw(), client.window, atoms_.net_wm_state);
+}
+
+void WM::clear_urgency(xcb_window_t window) {
+  for (auto& ws : workspaces_) {
+    if (auto idx = find_client_index(ws, window); idx.has_value()) {
+      ws.clients()[*idx].urgent = false;
+      break;
+    }
+  }
+
+  xcb_icccm_wm_hints_t hints{};
+  xcb_get_property_cookie_t cookie = xcb_icccm_get_wm_hints(connection_.raw(), window);
+  if (xcb_icccm_get_wm_hints_reply(connection_.raw(), cookie, &hints, nullptr) == 1) {
+    hints.flags &= static_cast<uint32_t>(~XCB_ICCCM_WM_HINT_X_URGENCY);
+    xcb_icccm_set_wm_hints(connection_.raw(), window, &hints);
+  }
+}
+
+bool WM::query_window_urgent(xcb_window_t window) const {
+  xcb_icccm_wm_hints_t hints{};
+  xcb_get_property_cookie_t cookie = xcb_icccm_get_wm_hints(connection_.raw(), window);
+  if (xcb_icccm_get_wm_hints_reply(connection_.raw(), cookie, &hints, nullptr) != 1) {
+    return false;
+  }
+  return (hints.flags & XCB_ICCCM_WM_HINT_X_URGENCY) != 0U;
+}
+
+WM::SavedGeometry WM::query_geometry(xcb_window_t window) const {
+  SavedGeometry geometry;
+  auto cookie = xcb_get_geometry(connection_.raw(), window);
+  xcb_get_geometry_reply_t* reply = xcb_get_geometry_reply(connection_.raw(), cookie, nullptr);
+  if (reply == nullptr) {
+    return geometry;
+  }
+  geometry.x = reply->x;
+  geometry.y = reply->y;
+  geometry.width = reply->width;
+  geometry.height = reply->height;
+  geometry.valid = true;
+  free(reply);
+  return geometry;
+}
+
+void WM::set_fullscreen(model::Client& client, bool enabled) {
+  if (enabled) {
+    for (auto& other : current_workspace().clients()) {
+      if (other.window != client.window && other.fullscreen) {
+        other.fullscreen = false;
+        update_window_state_property(other);
+        const auto it = saved_geometry_.find(other.window);
+        if (it != saved_geometry_.end() && it->second.valid) {
+          const auto& g = it->second;
+          const uint32_t vals[] = {static_cast<uint32_t>(g.x), static_cast<uint32_t>(g.y), g.width, g.height,
+                                   static_cast<uint32_t>(config_.border_width)};
+          xcb_configure_window(connection_.raw(), other.window,
+                               XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH |
+                                   XCB_CONFIG_WINDOW_HEIGHT | XCB_CONFIG_WINDOW_BORDER_WIDTH,
+                               vals);
+        }
+      }
+    }
+    saved_geometry_[client.window] = query_geometry(client.window);
+    client.fullscreen = true;
+    update_window_state_property(client);
+    return;
+  }
+
+  client.fullscreen = false;
+  update_window_state_property(client);
+  const auto it = saved_geometry_.find(client.window);
+  if (it != saved_geometry_.end() && it->second.valid) {
+    const auto& g = it->second;
+    const uint32_t vals[] = {
+        static_cast<uint32_t>(g.x),
+        static_cast<uint32_t>(g.y),
+        g.width,
+        g.height,
+        static_cast<uint32_t>(config_.border_width),
+    };
+    xcb_configure_window(connection_.raw(), client.window,
+                         XCB_CONFIG_WINDOW_X |
+                             XCB_CONFIG_WINDOW_Y |
+                             XCB_CONFIG_WINDOW_WIDTH |
+                             XCB_CONFIG_WINDOW_HEIGHT |
+                             XCB_CONFIG_WINDOW_BORDER_WIDTH,
+                         vals);
+  }
 }
 
 bool WM::is_dialog_window(xcb_window_t window) const {

@@ -6,6 +6,10 @@ namespace scrollwm::layout {
 
 ScrollLayout::ScrollLayout(config::Direction direction) : direction_(direction) {}
 
+void ScrollLayout::set_direction(config::Direction direction) { direction_ = direction; }
+
+config::Direction ScrollLayout::direction() const { return direction_; }
+
 std::vector<Rect> ScrollLayout::compute(const model::Workspace& workspace,
                                         int screen_width,
                                         int screen_height,

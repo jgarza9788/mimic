@@ -25,6 +25,10 @@ struct Config {
     std::string move_to_workspace_2 = "Mod+Shift+2";
     std::string move_to_workspace_3 = "Mod+Shift+3";
     std::string move_to_workspace_4 = "Mod+Shift+4";
+    std::string toggle_layout_direction = "Mod+Space";
+    std::string reorder_next = "Mod+Shift+J";
+    std::string reorder_prev = "Mod+Shift+K";
+    std::string toggle_fullscreen = "Mod+F";
   } bindings;
 
   std::string mod_key = "Mod4";

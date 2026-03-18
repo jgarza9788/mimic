@@ -142,6 +142,14 @@ Config load_from_path(const std::filesystem::path& path) {
       cfg.bindings.move_to_workspace_3 = strip_quotes(raw_value);
     } else if (qualified_key == "bindings.move_to_workspace_4") {
       cfg.bindings.move_to_workspace_4 = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.toggle_layout_direction") {
+      cfg.bindings.toggle_layout_direction = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.reorder_next") {
+      cfg.bindings.reorder_next = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.reorder_prev") {
+      cfg.bindings.reorder_prev = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.toggle_fullscreen") {
+      cfg.bindings.toggle_fullscreen = strip_quotes(raw_value);
     }
   }
 
