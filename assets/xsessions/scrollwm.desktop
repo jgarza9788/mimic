@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=ScrollWM
+Comment=Scrollable tiling window manager for X11
+Exec=scrollwm-session
+Type=Application
+DesktopNames=ScrollWM
+Keywords=tiling;windowmanager;x11;
