@@ -1,21 +1,31 @@
 [schema]
+# Internal config schema version. Leave this as-is unless release notes say otherwise.
 version = 1
 
 [general]
+# Modifier key used in keyboard shortcuts. Common options: "Mod4" (Super/Win) or "Mod1" (Alt).
 mod_key = "Mod4"
+# Number of workspaces to create at startup.
 workspace_count = 4
+# If true, moving the mouse over a window will focus it automatically.
 focus_follows_mouse = false
+# Terminal command used by the spawn_terminal keybinding.
 terminal = "xterm"
 
 [layout]
+# Tiling direction for new windows: "horizontal" or "vertical".
 layout_direction = "horizontal"
 
 [appearance]
+# Space (in pixels) between tiled windows.
 gap = 12
+# Border width (in pixels) around focused/unfocused windows.
 border_width = 2
+# Space (in pixels) between windows and screen edges.
 outer_padding = 12
 
 [bindings]
+# Keybinding format: "Mod+Key", "Mod+Shift+Key", etc.
 focus_next = "Mod+J"
 focus_prev = "Mod+K"
 spawn_terminal = "Mod+Return"
@@ -35,5 +45,10 @@ reorder_prev = "Mod+Shift+K"
 toggle_fullscreen = "Mod+F"
 
 [autostart]
+# If true, run the compositor command below when the WM starts.
 launch_picom = false
+# Example start command with an explicit config file path:
+# compositor = "picom --config /path/to/picom.conf --experimental-backends"
+# Example restart command (kills old picom, then starts with config):
+# compositor = "pkill -x picom; picom --config /path/to/picom.conf --experimental-backends"
 compositor = "picom --experimental-backends"
