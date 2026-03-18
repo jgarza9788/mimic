@@ -1,0 +1,65 @@
+.TH SCROLLWM 1 "March 2026" "scrollwm 0.1.0" "User Commands"
+.SH NAME
+scrollwm \- experimental scrollable tiling window manager for X11
+.SH SYNOPSIS
+.B scrollwm
+.SH DESCRIPTION
+.B scrollwm
+is an experimental, keyboard-first tiling window manager for X11/XLibre.
+It arranges windows in a scrollable linear layout and supports multiple workspaces,
+runtime layout direction toggling, fullscreen restore semantics, and configurable keybindings.
+.SH CONFIGURATION
+Configuration is loaded from:
+.PP
+.I ~/.config/scrollwm/config.toml
+.PP
+If the file is missing, built-in defaults are used.
+.SH DEFAULT KEYBINDINGS
+.TP
+.B Mod+Enter
+Launch terminal
+.TP
+.B Mod+j / Mod+k
+Focus next / previous window
+.TP
+.B Mod+1..4
+Switch workspace
+.TP
+.B Mod+Shift+1..4
+Move focused window to workspace
+.TP
+.B Mod+Space
+Toggle layout direction (horizontal/vertical)
+.TP
+.B Mod+Shift+j / Mod+Shift+k
+Reorder focused window in scroll order
+.TP
+.B Mod+f
+Toggle fullscreen on focused tiled window
+.TP
+.B Mod+q
+Close focused window via WM_DELETE_WINDOW
+.TP
+.B Mod+Shift+e
+Exit ScrollWM
+.SH SESSION INTEGRATION
+For display manager sessions, use:
+.PP
+.B scrollwm-session
+.PP
+which optionally starts picom according to config and then execs
+.BR scrollwm .
+.SH FILES
+.TP
+.I /usr/share/xsessions/scrollwm.desktop
+Display manager desktop entry.
+.TP
+.I /usr/share/doc/scrollwm/config.toml.example
+Example configuration.
+.SH EXIT STATUS
+.B scrollwm
+returns 0 on normal exit and non-zero on startup/runtime failure.
+.SH SEE ALSO
+.BR scrollwm-session (1)
+.SH AUTHORS
+ScrollWM contributors.

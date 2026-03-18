@@ -27,8 +27,8 @@
 - [x] Better focus history and urgent window handling
 
 ## M3 - Packaging and ops
-- [ ] man page (`scrollwm(1)`)
-- [ ] Dist package scaffolding
-- [ ] CI build + static analysis
-- [ ] Config schema validation and migration notes
-- [ ] Demo recordings/screenshots and troubleshooting guide
+- [x] man page (`scrollwm(1)`)
+- [x] Dist package scaffolding
+- [x] CI build + static analysis
+- [x] Config schema validation and migration notes
+- [x] Demo recordings/screenshots and troubleshooting guide

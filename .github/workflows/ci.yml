@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            g++ meson ninja-build pkg-config \
+            libxcb1-dev libxcb-keysyms1-dev libxcb-icccm4-dev \
+            cppcheck
+
+      - name: Configure
+        run: meson setup build --werror
+
+      - name: Build
+        run: meson compile -C build
+
+      - name: Unit tests
+        run: meson test -C build --print-errorlogs
+
+      - name: Config schema validation
+        run: ./scripts/validate-config-schema.py config/config.toml.example
+
+      - name: Static analysis (cppcheck)
+        run: |
+          cppcheck \
+            --enable=warning,performance,portability,style \
+            --std=c++20 \
+            --error-exitcode=1 \
+            --inline-suppr \
+            --quiet \
+            src

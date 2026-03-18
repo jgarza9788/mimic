@@ -1,0 +1,6 @@
+usr/bin/scrollwm
+usr/bin/scrollwm-session
+usr/share/xsessions/scrollwm.desktop
+usr/share/doc/scrollwm/*
+usr/share/man/man1/scrollwm.1
+usr/share/man/man1/scrollwm-session.1

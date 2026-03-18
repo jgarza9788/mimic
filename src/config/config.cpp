@@ -98,6 +98,8 @@ Config load_from_path(const std::filesystem::path& path) {
 
     if (qualified_key == "general.mod_key") {
       cfg.mod_key = strip_quotes(raw_value);
+    } else if (qualified_key == "schema.version") {
+      cfg.schema_version = std::stoi(raw_value);
     } else if (qualified_key == "general.workspace_count") {
       cfg.workspace_count = std::stoi(raw_value);
     } else if (qualified_key == "general.focus_follows_mouse") {
@@ -155,6 +157,9 @@ Config load_from_path(const std::filesystem::path& path) {
 
   if (cfg.workspace_count < 1) {
     cfg.workspace_count = 1;
+  }
+  if (cfg.schema_version < 1) {
+    cfg.schema_version = 1;
   }
 
   return cfg;

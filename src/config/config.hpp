@@ -11,6 +11,8 @@ enum class Direction {
 };
 
 struct Config {
+  int schema_version = 1;
+
   struct BindingSet {
     std::string focus_next = "Mod+J";
     std::string focus_prev = "Mod+K";

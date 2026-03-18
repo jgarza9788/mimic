@@ -74,6 +74,22 @@ install_data('docs/milestones.md',
   install_dir: join_paths(get_option('datadir'), 'doc', 'scrollwm')
 )
 
+install_data('docs/config-schema.md',
+  install_dir: join_paths(get_option('datadir'), 'doc', 'scrollwm')
+)
+
+install_data('docs/demo-and-troubleshooting.md',
+  install_dir: join_paths(get_option('datadir'), 'doc', 'scrollwm')
+)
+
+install_data('docs/man/scrollwm.1',
+  install_dir: join_paths(get_option('datadir'), 'man', 'man1')
+)
+
+install_data('docs/man/scrollwm-session.1',
+  install_dir: join_paths(get_option('datadir'), 'man', 'man1')
+)
+
 install_data('scripts/scrollwm-session',
   install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x'
