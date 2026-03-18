@@ -401,15 +401,25 @@ void WM::handle_client_message(const xcb_client_message_event_t& event) {
 
   if (event.type == atoms_.net_wm_desktop) {
     const int target = static_cast<int>(event.data.data32[0]);
-    if (target < 0 || target >= static_cast<int>(workspaces_.size())) {
+    if (target < 0) {
       return;
     }
+    ensure_workspace_exists(target);
 
     for (auto& ws : workspaces_) {
       if (auto idx = find_client_index(ws, event.window); idx.has_value()) {
         model::Client moved = ws.clients()[*idx];
         ws.remove_client(event.window);
         workspaces_[static_cast<size_t>(target)].add_client(moved);
+        cleanup_empty_workspaces();
+
+        const int desktop_idx = find_workspace_of_client(event.window);
+        if (desktop_idx >= 0) {
+          const uint32_t desktop = static_cast<uint32_t>(desktop_idx);
+          xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, event.window,
+                              atoms_.net_wm_desktop, XCB_ATOM_CARDINAL, 32, 1, &desktop);
+        }
+
         relayout();
         set_client_list_property();
         return;
@@ -514,6 +524,7 @@ void WM::remove_client(xcb_window_t window) {
   for (auto& ws : workspaces_) {
     ws.remove_client(window);
   }
+  cleanup_empty_workspaces();
   relayout();
   set_client_list_property();
 }
@@ -552,8 +563,13 @@ void WM::focus_prev() {
 }
 
 void WM::switch_workspace(int idx) {
+  if (idx < 0) {
+    return;
+  }
+  ensure_workspace_exists(idx);
+
   auto& monitor = monitors_[static_cast<size_t>(active_monitor_idx_)];
-  if (idx < 0 || idx >= static_cast<int>(workspaces_.size()) || idx == monitor.workspace_idx) {
+  if (idx == monitor.workspace_idx) {
     return;
   }
 
@@ -573,9 +589,10 @@ void WM::switch_workspace(int idx) {
 void WM::move_focused_to_workspace(int idx) {
   const int current_workspace_idx =
       monitors_[static_cast<size_t>(active_monitor_idx_)].workspace_idx;
-  if (idx < 0 || idx >= static_cast<int>(workspaces_.size()) || idx == current_workspace_idx) {
+  if (idx < 0 || idx == current_workspace_idx) {
     return;
   }
+  ensure_workspace_exists(idx);
 
   auto& from = current_workspace();
   auto* focused = from.focused_client();
@@ -586,12 +603,53 @@ void WM::move_focused_to_workspace(int idx) {
   const model::Client moved = *focused;
   from.remove_client(focused->window);
   workspaces_[static_cast<size_t>(idx)].add_client(moved);
-  const uint32_t desktop = static_cast<uint32_t>(idx);
-  xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, moved.window,
-                      atoms_.net_wm_desktop, XCB_ATOM_CARDINAL, 32, 1, &desktop);
+  cleanup_empty_workspaces();
+
+  const int desktop_idx = find_workspace_of_client(moved.window);
+  if (desktop_idx >= 0) {
+    const uint32_t desktop = static_cast<uint32_t>(desktop_idx);
+    xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, moved.window,
+                        atoms_.net_wm_desktop, XCB_ATOM_CARDINAL, 32, 1, &desktop);
+  }
   xcb_unmap_window(connection_.raw(), moved.window);
   set_client_list_property();
   relayout();
+}
+
+void WM::ensure_workspace_exists(int idx) {
+  const size_t previous_size = workspaces_.size();
+  model::ensure_workspace_exists(workspaces_, idx);
+  if (workspaces_.size() != previous_size) {
+    set_desktop_properties();
+  }
+}
+
+void WM::cleanup_empty_workspaces() {
+  std::vector<int> monitor_indices;
+  monitor_indices.reserve(monitors_.size());
+  for (const auto& monitor : monitors_) {
+    monitor_indices.push_back(monitor.workspace_idx);
+  }
+
+  const size_t previous_size = workspaces_.size();
+  model::cleanup_empty_workspaces(workspaces_, monitor_indices);
+
+  for (size_t i = 0; i < monitors_.size() && i < monitor_indices.size(); ++i) {
+    monitors_[i].workspace_idx = monitor_indices[i];
+  }
+
+  if (workspaces_.size() != previous_size) {
+    set_desktop_properties();
+  }
+}
+
+int WM::find_workspace_of_client(xcb_window_t window) const {
+  for (size_t ws_idx = 0; ws_idx < workspaces_.size(); ++ws_idx) {
+    if (find_client_index(workspaces_[ws_idx], window).has_value()) {
+      return static_cast<int>(ws_idx);
+    }
+  }
+  return -1;
 }
 
 void WM::reorder_focused_forward() {

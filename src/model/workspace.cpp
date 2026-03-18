@@ -8,6 +8,8 @@ Workspace::Workspace(int index) : index_(index) {}
 
 int Workspace::index() const { return index_; }
 
+void Workspace::set_index(int index) { index_ = index; }
+
 std::vector<Client>& Workspace::clients() { return clients_; }
 
 const std::vector<Client>& Workspace::clients() const { return clients_; }
@@ -150,5 +152,54 @@ const Client* Workspace::focused_client() const {
 int Workspace::scroll_offset() const { return scroll_offset_; }
 
 void Workspace::set_scroll_offset(int offset) { scroll_offset_ = offset; }
+
+void ensure_workspace_exists(std::vector<Workspace>& workspaces, int idx) {
+  if (idx < 0) {
+    return;
+  }
+  while (idx >= static_cast<int>(workspaces.size())) {
+    workspaces.emplace_back(static_cast<int>(workspaces.size()));
+  }
+}
+
+void cleanup_empty_workspaces(std::vector<Workspace>& workspaces,
+                              std::vector<int>& tracked_workspace_indices) {
+  if (workspaces.empty()) {
+    workspaces.emplace_back(0);
+  }
+
+  size_t i = 0;
+  while (i < workspaces.size()) {
+    if (workspaces.size() == 1 || !workspaces[i].clients().empty()) {
+      ++i;
+      continue;
+    }
+
+    const int removed_idx = static_cast<int>(i);
+    const int last_idx_before_erase = static_cast<int>(workspaces.size()) - 1;
+    for (int& tracked_idx : tracked_workspace_indices) {
+      if (tracked_idx == removed_idx) {
+        tracked_idx = removed_idx < last_idx_before_erase ? removed_idx : removed_idx - 1;
+      } else if (tracked_idx > removed_idx) {
+        --tracked_idx;
+      }
+    }
+
+    workspaces.erase(workspaces.begin() + static_cast<std::ptrdiff_t>(i));
+  }
+
+  if (workspaces.empty()) {
+    workspaces.emplace_back(0);
+  }
+
+  for (size_t idx = 0; idx < workspaces.size(); ++idx) {
+    workspaces[idx].set_index(static_cast<int>(idx));
+  }
+
+  const int max_idx = static_cast<int>(workspaces.size()) - 1;
+  for (int& tracked_idx : tracked_workspace_indices) {
+    tracked_idx = std::clamp(tracked_idx, 0, max_idx);
+  }
+}
 
 }  // namespace scrollwm::model
