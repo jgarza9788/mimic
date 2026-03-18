@@ -126,6 +126,35 @@ Run unit tests after building:
 meson test -C build --print-errorlogs
 ```
 
+Validate configuration schema:
+
+```bash
+./scripts/validate-config-schema.py config/config.toml.example
+```
+
+## Packaging scaffolding
+
+Starter distro packaging metadata lives in [`packaging/`](packaging/):
+
+- Debian/Ubuntu scaffold: `packaging/debian/`
+- RPM scaffold: `packaging/rpm/scrollwm.spec`
+
+## CI + static analysis
+
+GitHub Actions CI is defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and runs:
+
+- Meson configure/build
+- Unit tests
+- Config schema validation
+- `cppcheck` static analysis
+
+## Man pages and operations docs
+
+- `docs/man/scrollwm.1`
+- `docs/man/scrollwm-session.1`
+- `docs/config-schema.md`
+- `docs/demo-and-troubleshooting.md`
+
 ## Development roadmap
 
 See [docs/milestones.md](docs/milestones.md).

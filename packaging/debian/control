@@ -1,0 +1,16 @@
+Source: scrollwm
+Section: x11
+Priority: optional
+Maintainer: ScrollWM Maintainers <maintainers@example.com>
+Build-Depends: debhelper-compat (= 13), meson, ninja-build, pkg-config,
+               libxcb1-dev, libxcb-keysyms1-dev, libxcb-icccm4-dev
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://example.com/scrollwm
+
+Package: scrollwm
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: experimental scrollable tiling window manager for X11
+ ScrollWM is a keyboard-first tiling window manager with a scrollable layout,
+ workspaces, configurable keybindings, and X session integration.

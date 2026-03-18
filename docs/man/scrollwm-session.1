@@ -1,0 +1,21 @@
+.TH SCROLLWM-SESSION 1 "March 2026" "scrollwm 0.1.0" "User Commands"
+.SH NAME
+scrollwm-session \- session wrapper for ScrollWM
+.SH SYNOPSIS
+.B scrollwm-session
+.SH DESCRIPTION
+.B scrollwm-session
+reads the ScrollWM config file and optionally launches a compositor before execing
+.BR scrollwm .
+.SH CONFIGURATION
+Uses
+.I ~/.config/scrollwm/config.toml
+and reads autostart settings:
+.TP
+.B [autostart].launch_picom
+Boolean toggle.
+.TP
+.B [autostart].compositor
+Command string for compositor launch.
+.SH SEE ALSO
+.BR scrollwm (1)

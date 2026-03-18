@@ -97,6 +97,8 @@ bool test_config_parse() {
   const auto tmp = std::filesystem::temp_directory_path() / "scrollwm-config-test.toml";
   {
     std::ofstream out(tmp);
+    out << "[schema]\n";
+    out << "version = 1\n";
     out << "[general]\n";
     out << "mod_key = \"Mod1\"\n";
     out << "workspace_count = 6\n";
@@ -119,7 +121,7 @@ bool test_config_parse() {
   const auto cfg = scrollwm::config::load_from_path(tmp);
   std::filesystem::remove(tmp);
 
-  if (cfg.mod_key != "Mod1" || cfg.workspace_count != 6 || !cfg.focus_follows_mouse ||
+  if (cfg.schema_version != 1 || cfg.mod_key != "Mod1" || cfg.workspace_count != 6 || !cfg.focus_follows_mouse ||
       cfg.terminal != "alacritty") {
     std::cerr << "general config parse mismatch\n";
     return false;

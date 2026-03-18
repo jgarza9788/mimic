@@ -1,3 +1,6 @@
+[schema]
+version = 1
+
 [general]
 mod_key = "Mod4"
 workspace_count = 4
