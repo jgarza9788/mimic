@@ -7,6 +7,7 @@
 #include <array>
 #include <cctype>
 #include <cstdlib>
+#include <cstdint>
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -493,8 +494,10 @@ void WM::add_client(xcb_window_t window) {
     uint32_t float_vals[] = {
         static_cast<uint32_t>(connection_.screen()->width_in_pixels / 6),
         static_cast<uint32_t>(connection_.screen()->height_in_pixels / 6),
-        std::max(hints.min_width, connection_.screen()->width_in_pixels / 2),
-        std::max(hints.min_height, connection_.screen()->height_in_pixels / 2),
+        std::max<uint32_t>(hints.min_width,
+                           static_cast<uint32_t>(connection_.screen()->width_in_pixels / 2)),
+        std::max<uint32_t>(hints.min_height,
+                           static_cast<uint32_t>(connection_.screen()->height_in_pixels / 2)),
     };
     xcb_configure_window(connection_.raw(), window,
                          XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y |
@@ -797,7 +800,8 @@ void WM::clear_urgency(xcb_window_t window) {
   xcb_icccm_wm_hints_t hints{};
   xcb_get_property_cookie_t cookie = xcb_icccm_get_wm_hints(connection_.raw(), window);
   if (xcb_icccm_get_wm_hints_reply(connection_.raw(), cookie, &hints, nullptr) == 1) {
-    hints.flags &= static_cast<uint32_t>(~XCB_ICCCM_WM_HINT_X_URGENCY);
+    const auto non_urgency_mask = static_cast<int32_t>(~XCB_ICCCM_WM_HINT_X_URGENCY);
+    hints.flags &= non_urgency_mask;
     xcb_icccm_set_wm_hints(connection_.raw(), window, &hints);
   }
 }
@@ -911,8 +915,7 @@ WM::SizeConstraints WM::query_size_constraints(xcb_window_t window) const {
   xcb_size_hints_t hints{};
 
   xcb_get_property_cookie_t cookie = xcb_icccm_get_wm_normal_hints(connection_.raw(), window);
-  uint8_t supplied = 0;
-  if (xcb_icccm_get_wm_normal_hints_reply(connection_.raw(), cookie, &hints, &supplied) == 1) {
+  if (xcb_icccm_get_wm_normal_hints_reply(connection_.raw(), cookie, &hints, nullptr) == 1) {
     if ((hints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE) != 0U) {
       constraints.min_width = static_cast<uint32_t>(std::max(0, hints.min_width));
       constraints.min_height = static_cast<uint32_t>(std::max(0, hints.min_height));
