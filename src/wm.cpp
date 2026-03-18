@@ -5,9 +5,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include <string>
+#include <vector>
+
+#include <xcb/xcb_icccm.h>
 
 #include "util/log.hpp"
 #include "x11/events.hpp"
@@ -24,6 +29,55 @@ uint16_t parse_mod_mask(const std::string& mod_key) {
     return XCB_MOD_MASK_4;
   }
   return XCB_MOD_MASK_4;
+}
+
+xcb_keysym_t parse_keysym_name(std::string key) {
+  std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
+
+  if (key.size() == 1U) {
+    return static_cast<xcb_keysym_t>(std::toupper(static_cast<unsigned char>(key[0])));
+  }
+  if (key == "enter" || key == "return") {
+    return XK_Return;
+  }
+  if (key == "space") {
+    return XK_space;
+  }
+  if (key == "tab") {
+    return XK_Tab;
+  }
+  if (key.size() >= 2 && key[0] == 'f') {
+    const std::string function_part = key.substr(1);
+    if (!std::all_of(function_part.begin(), function_part.end(), [](unsigned char c) {
+          return std::isdigit(c) != 0;
+        })) {
+      return XCB_NO_SYMBOL;
+    }
+    const int fn = std::stoi(function_part);
+    if (fn >= 1 && fn <= 12) {
+      return static_cast<xcb_keysym_t>(XK_F1 + (fn - 1));
+    }
+  }
+
+  return XCB_NO_SYMBOL;
+}
+
+std::vector<std::string> split_tokens(const std::string& combo) {
+  std::vector<std::string> tokens;
+  std::stringstream stream(combo);
+  std::string token;
+  while (std::getline(stream, token, '+')) {
+    token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char c) {
+                  return std::isspace(c) != 0;
+                }),
+                token.end());
+    if (!token.empty()) {
+      tokens.push_back(token);
+    }
+  }
+  return tokens;
 }
 
 constexpr std::array<uint16_t, 4> kIgnoredLocks = {
@@ -111,23 +165,46 @@ void WM::setup_root_events() {
 }
 
 void WM::setup_ewmh() {
+  std::array<xcb_atom_t, 9> supported = {
+      atoms_.net_active_window,
+      atoms_.net_client_list,
+      atoms_.net_number_of_desktops,
+      atoms_.net_current_desktop,
+      atoms_.net_desktop_names,
+      atoms_.net_wm_desktop,
+      atoms_.net_wm_state,
+      atoms_.net_wm_state_fullscreen,
+      atoms_.net_supported,
+  };
+  xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, connection_.screen()->root,
+                      atoms_.net_supported, XCB_ATOM_ATOM, 32,
+                      static_cast<uint32_t>(supported.size()), supported.data());
   set_desktop_properties();
   set_client_list_property();
 }
 
 void WM::setup_keys() {
-  const uint16_t mod = parse_mod_mask(config_.mod_key);
-  bindings_ = {
-      {mod, XK_j, KeyBinding::Action::FocusNext},
-      {mod, XK_k, KeyBinding::Action::FocusPrev},
-      {mod, XK_Return, KeyBinding::Action::SpawnTerminal},
-      {mod, XK_q, KeyBinding::Action::CloseFocused},
-      {static_cast<uint16_t>(mod | XCB_MOD_MASK_SHIFT), XK_e, KeyBinding::Action::Exit},
-      {mod, XK_1, KeyBinding::Action::Workspace1},
-      {mod, XK_2, KeyBinding::Action::Workspace2},
-      {mod, XK_3, KeyBinding::Action::Workspace3},
-      {mod, XK_4, KeyBinding::Action::Workspace4},
+  bindings_.clear();
+  const auto add_binding = [this](const std::string& combo, KeyBinding::Action action) {
+    auto parsed = parse_keybinding(combo, action);
+    if (parsed.has_value()) {
+      bindings_.push_back(*parsed);
+    }
   };
+
+  add_binding(config_.bindings.focus_next, KeyBinding::Action::FocusNext);
+  add_binding(config_.bindings.focus_prev, KeyBinding::Action::FocusPrev);
+  add_binding(config_.bindings.spawn_terminal, KeyBinding::Action::SpawnTerminal);
+  add_binding(config_.bindings.close_window, KeyBinding::Action::CloseFocused);
+  add_binding(config_.bindings.exit_wm, KeyBinding::Action::Exit);
+  add_binding(config_.bindings.workspace_1, KeyBinding::Action::Workspace1);
+  add_binding(config_.bindings.workspace_2, KeyBinding::Action::Workspace2);
+  add_binding(config_.bindings.workspace_3, KeyBinding::Action::Workspace3);
+  add_binding(config_.bindings.workspace_4, KeyBinding::Action::Workspace4);
+  add_binding(config_.bindings.move_to_workspace_1, KeyBinding::Action::MoveToWorkspace1);
+  add_binding(config_.bindings.move_to_workspace_2, KeyBinding::Action::MoveToWorkspace2);
+  add_binding(config_.bindings.move_to_workspace_3, KeyBinding::Action::MoveToWorkspace3);
+  add_binding(config_.bindings.move_to_workspace_4, KeyBinding::Action::MoveToWorkspace4);
 
   for (const auto& binding : bindings_) {
     xcb_keycode_t* keycodes = xcb_key_symbols_get_keycode(key_symbols_, binding.keysym);
@@ -271,6 +348,18 @@ void WM::handle_key_press(const xcb_key_press_event_t& event) {
       case KeyBinding::Action::Workspace4:
         switch_workspace(3);
         break;
+      case KeyBinding::Action::MoveToWorkspace1:
+        move_focused_to_workspace(0);
+        break;
+      case KeyBinding::Action::MoveToWorkspace2:
+        move_focused_to_workspace(1);
+        break;
+      case KeyBinding::Action::MoveToWorkspace3:
+        move_focused_to_workspace(2);
+        break;
+      case KeyBinding::Action::MoveToWorkspace4:
+        move_focused_to_workspace(3);
+        break;
     }
     return;
   }
@@ -284,6 +373,40 @@ void WM::handle_client_message(const xcb_client_message_event_t& event) {
 
   if (event.type == atoms_.net_current_desktop) {
     switch_workspace(static_cast<int>(event.data.data32[0]));
+    return;
+  }
+
+  if (event.type == atoms_.net_wm_desktop) {
+    const int target = static_cast<int>(event.data.data32[0]);
+    if (target < 0 || target >= static_cast<int>(workspaces_.size())) {
+      return;
+    }
+
+    for (auto& ws : workspaces_) {
+      if (auto idx = find_client_index(ws, event.window); idx.has_value()) {
+        model::Client moved = ws.clients()[*idx];
+        ws.remove_client(event.window);
+        workspaces_[static_cast<size_t>(target)].add_client(moved);
+        relayout();
+        set_client_list_property();
+        return;
+      }
+    }
+  }
+
+  if (event.type == atoms_.net_wm_state) {
+    auto& ws = current_workspace();
+    if (auto idx = find_client_index(ws, event.window); idx.has_value()) {
+      auto& client = ws.clients()[*idx];
+      const bool fullscreen_request =
+          event.data.data32[1] == atoms_.net_wm_state_fullscreen ||
+          event.data.data32[2] == atoms_.net_wm_state_fullscreen;
+      if (fullscreen_request) {
+        client.fullscreen = event.data.data32[0] != 0;
+        update_window_state_property(client);
+        relayout();
+      }
+    }
   }
 }
 
@@ -318,6 +441,9 @@ void WM::add_client(xcb_window_t window) {
     return;
   }
 
+  const bool floating = is_dialog_window(window) || is_transient_window(window);
+  const auto hints = query_size_constraints(window);
+
   uint32_t values[] = {
       static_cast<uint32_t>(XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_PROPERTY_CHANGE),
       static_cast<uint32_t>(config_.border_width),
@@ -325,12 +451,29 @@ void WM::add_client(xcb_window_t window) {
   xcb_change_window_attributes(connection_.raw(), window, XCB_CW_EVENT_MASK, values);
   xcb_configure_window(connection_.raw(), window, XCB_CONFIG_WINDOW_BORDER_WIDTH, &values[1]);
 
-  ws.add_client(model::Client{.window = window});
+  ws.add_client(model::Client{.window = window, .floating = floating});
+  const uint32_t desktop = static_cast<uint32_t>(current_workspace_idx_);
+  xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, window,
+                      atoms_.net_wm_desktop, XCB_ATOM_CARDINAL, 32, 1, &desktop);
+  size_constraints_[window] = hints;
   focus_window(window);
+  if (floating) {
+    uint32_t float_vals[] = {
+        static_cast<uint32_t>(connection_.screen()->width_in_pixels / 6),
+        static_cast<uint32_t>(connection_.screen()->height_in_pixels / 6),
+        std::max(hints.min_width, connection_.screen()->width_in_pixels / 2),
+        std::max(hints.min_height, connection_.screen()->height_in_pixels / 2),
+    };
+    xcb_configure_window(connection_.raw(), window,
+                         XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y |
+                             XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT,
+                         float_vals);
+  }
   set_client_list_property();
 }
 
 void WM::remove_client(xcb_window_t window) {
+  size_constraints_.erase(window);
   for (auto& ws : workspaces_) {
     ws.remove_client(window);
   }
@@ -380,6 +523,28 @@ void WM::switch_workspace(int idx) {
   relayout();
 }
 
+void WM::move_focused_to_workspace(int idx) {
+  if (idx < 0 || idx >= static_cast<int>(workspaces_.size()) || idx == current_workspace_idx_) {
+    return;
+  }
+
+  auto& from = current_workspace();
+  auto* focused = from.focused_client();
+  if (focused == nullptr) {
+    return;
+  }
+
+  const model::Client moved = *focused;
+  from.remove_client(focused->window);
+  workspaces_[static_cast<size_t>(idx)].add_client(moved);
+  const uint32_t desktop = static_cast<uint32_t>(idx);
+  xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, moved.window,
+                      atoms_.net_wm_desktop, XCB_ATOM_CARDINAL, 32, 1, &desktop);
+  xcb_unmap_window(connection_.raw(), moved.window);
+  set_client_list_property();
+  relayout();
+}
+
 void WM::kill_focused() {
   auto* client = current_workspace().focused_client();
   if (client == nullptr) {
@@ -400,6 +565,28 @@ void WM::kill_focused() {
 
 void WM::relayout() {
   auto& ws = current_workspace();
+
+  for (auto& client : ws.clients()) {
+    if (client.fullscreen) {
+      const uint32_t vals[] = {
+          0,
+          0,
+          static_cast<uint32_t>(connection_.screen()->width_in_pixels),
+          static_cast<uint32_t>(connection_.screen()->height_in_pixels),
+          0,
+      };
+      xcb_configure_window(connection_.raw(), client.window,
+                           XCB_CONFIG_WINDOW_X |
+                               XCB_CONFIG_WINDOW_Y |
+                               XCB_CONFIG_WINDOW_WIDTH |
+                               XCB_CONFIG_WINDOW_HEIGHT |
+                               XCB_CONFIG_WINDOW_BORDER_WIDTH,
+                           vals);
+      focus_window(client.window);
+      return;
+    }
+  }
+
   int offset = ws.scroll_offset();
   const auto rects = layout_engine_.compute(
       ws,
@@ -413,11 +600,22 @@ void WM::relayout() {
 
   const auto& clients = ws.clients();
   for (size_t i = 0; i < clients.size() && i < rects.size(); ++i) {
+    if (clients[i].floating) {
+      continue;
+    }
+    uint32_t width = static_cast<uint32_t>(rects[i].width);
+    uint32_t height = static_cast<uint32_t>(rects[i].height);
+    const auto it = size_constraints_.find(clients[i].window);
+    if (it != size_constraints_.end()) {
+      width = std::max(width, it->second.min_width);
+      height = std::max(height, it->second.min_height);
+    }
+
     const uint32_t vals[] = {
         static_cast<uint32_t>(rects[i].x),
         static_cast<uint32_t>(rects[i].y),
-        static_cast<uint32_t>(rects[i].width),
-        static_cast<uint32_t>(rects[i].height),
+        width,
+        height,
         static_cast<uint32_t>(config_.border_width),
     };
     xcb_configure_window(connection_.raw(), clients[i].window,
@@ -473,6 +671,17 @@ void WM::set_desktop_properties() {
   xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, connection_.screen()->root,
                       atoms_.net_current_desktop, XCB_ATOM_CARDINAL, 32, 1,
                       &current_desktop);
+
+  std::string names;
+  for (uint32_t i = 0; i < desktop_count; ++i) {
+    names += "Workspace ";
+    names += std::to_string(i + 1);
+    names.push_back('\0');
+  }
+
+  xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, connection_.screen()->root,
+                      atoms_.net_desktop_names, XCB_ATOM_STRING, 8,
+                      static_cast<uint32_t>(names.size()), names.data());
 }
 
 void WM::spawn_command(const std::string& cmd) const {
@@ -485,6 +694,109 @@ void WM::spawn_command(const std::string& cmd) const {
     execl("/bin/sh", "sh", "-c", cmd.c_str(), static_cast<char*>(nullptr));
     _exit(127);
   }
+}
+
+void WM::update_window_state_property(const model::Client& client) {
+  if (client.fullscreen) {
+    const xcb_atom_t fullscreen = atoms_.net_wm_state_fullscreen;
+    xcb_change_property(connection_.raw(), XCB_PROP_MODE_REPLACE, client.window,
+                        atoms_.net_wm_state, XCB_ATOM_ATOM, 32, 1, &fullscreen);
+    return;
+  }
+
+  xcb_delete_property(connection_.raw(), client.window, atoms_.net_wm_state);
+}
+
+bool WM::is_dialog_window(xcb_window_t window) const {
+  auto cookie = xcb_get_property(connection_.raw(), 0, window, atoms_.net_wm_window_type,
+                                 XCB_ATOM_ATOM, 0, 32);
+  xcb_get_property_reply_t* reply = xcb_get_property_reply(connection_.raw(), cookie, nullptr);
+  if (reply == nullptr) {
+    return false;
+  }
+
+  const xcb_atom_t* atoms = static_cast<xcb_atom_t*>(xcb_get_property_value(reply));
+  const int len = xcb_get_property_value_length(reply) / static_cast<int>(sizeof(xcb_atom_t));
+  bool is_dialog = false;
+  for (int i = 0; i < len; ++i) {
+    if (atoms[i] == atoms_.net_wm_window_type_dialog) {
+      is_dialog = true;
+      break;
+    }
+  }
+  free(reply);
+  return is_dialog;
+}
+
+bool WM::is_transient_window(xcb_window_t window) const {
+  auto cookie = xcb_get_property(connection_.raw(), 0, window, atoms_.wm_transient_for,
+                                 XCB_ATOM_WINDOW, 0, 1);
+  xcb_get_property_reply_t* reply = xcb_get_property_reply(connection_.raw(), cookie, nullptr);
+  if (reply == nullptr) {
+    return false;
+  }
+  const bool is_transient = xcb_get_property_value_length(reply) >= static_cast<int>(sizeof(xcb_window_t));
+  free(reply);
+  return is_transient;
+}
+
+WM::SizeConstraints WM::query_size_constraints(xcb_window_t window) const {
+  SizeConstraints constraints;
+  xcb_size_hints_t hints{};
+
+  xcb_get_property_cookie_t cookie = xcb_icccm_get_wm_normal_hints(connection_.raw(), window);
+  uint8_t supplied = 0;
+  if (xcb_icccm_get_wm_normal_hints_reply(connection_.raw(), cookie, &hints, &supplied) == 1) {
+    if ((hints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE) != 0U) {
+      constraints.min_width = static_cast<uint32_t>(std::max(0, hints.min_width));
+      constraints.min_height = static_cast<uint32_t>(std::max(0, hints.min_height));
+    }
+  }
+
+  return constraints;
+}
+
+std::optional<WM::KeyBinding> WM::parse_keybinding(const std::string& combo,
+                                                   KeyBinding::Action action) const {
+  uint16_t modifiers = 0;
+  xcb_keysym_t keysym = XCB_NO_SYMBOL;
+
+  for (const auto& token : split_tokens(combo)) {
+    std::string normalized = token;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+
+    if (normalized == "mod") {
+      modifiers = static_cast<uint16_t>(modifiers | parse_mod_mask(config_.mod_key));
+      continue;
+    }
+    if (normalized == "shift") {
+      modifiers = static_cast<uint16_t>(modifiers | XCB_MOD_MASK_SHIFT);
+      continue;
+    }
+    if (normalized == "control" || normalized == "ctrl") {
+      modifiers = static_cast<uint16_t>(modifiers | XCB_MOD_MASK_CONTROL);
+      continue;
+    }
+    if (normalized == "alt" || normalized == "mod1") {
+      modifiers = static_cast<uint16_t>(modifiers | XCB_MOD_MASK_1);
+      continue;
+    }
+    if (normalized == "super" || normalized == "mod4") {
+      modifiers = static_cast<uint16_t>(modifiers | XCB_MOD_MASK_4);
+      continue;
+    }
+
+    keysym = parse_keysym_name(normalized);
+  }
+
+  if (keysym == XCB_NO_SYMBOL) {
+    util::log(util::LogLevel::Warn, "skipping invalid binding: " + combo);
+    return std::nullopt;
+  }
+
+  return KeyBinding{.modifiers = modifiers, .keysym = keysym, .action = action};
 }
 
 }  // namespace scrollwm

@@ -116,6 +116,32 @@ Config load_from_path(const std::filesystem::path& path) {
       cfg.compositor_cmd = strip_quotes(raw_value);
     } else if (qualified_key == "autostart.launch_picom") {
       cfg.autostart_picom = to_bool(raw_value);
+    } else if (qualified_key == "bindings.focus_next") {
+      cfg.bindings.focus_next = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.focus_prev") {
+      cfg.bindings.focus_prev = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.spawn_terminal") {
+      cfg.bindings.spawn_terminal = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.close_window") {
+      cfg.bindings.close_window = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.exit_wm") {
+      cfg.bindings.exit_wm = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.workspace_1") {
+      cfg.bindings.workspace_1 = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.workspace_2") {
+      cfg.bindings.workspace_2 = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.workspace_3") {
+      cfg.bindings.workspace_3 = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.workspace_4") {
+      cfg.bindings.workspace_4 = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.move_to_workspace_1") {
+      cfg.bindings.move_to_workspace_1 = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.move_to_workspace_2") {
+      cfg.bindings.move_to_workspace_2 = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.move_to_workspace_3") {
+      cfg.bindings.move_to_workspace_3 = strip_quotes(raw_value);
+    } else if (qualified_key == "bindings.move_to_workspace_4") {
+      cfg.bindings.move_to_workspace_4 = strip_quotes(raw_value);
     }
   }
 

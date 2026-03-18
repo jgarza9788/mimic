@@ -13,11 +13,11 @@
 - [x] Basic unit tests for config/layout/workspace logic
 
 ## M1 - Desktop usability hardening
-- [ ] Improve ICCCM/EWMH coverage (`_NET_SUPPORTED`, `_NET_WM_STATE`, desktop names)
-- [ ] Better handling for transient/dialog/floating windows
-- [ ] Respect size hints and minimum sizes
-- [ ] Implement move window to workspace shortcuts
-- [ ] Configurable keybinding parser from TOML
+- [x] Improve ICCCM/EWMH coverage (`_NET_SUPPORTED`, `_NET_WM_STATE`, desktop names)
+- [x] Better handling for transient/dialog/floating windows
+- [x] Respect size hints and minimum sizes
+- [x] Implement move window to workspace shortcuts
+- [x] Configurable keybinding parser from TOML
 
 ## M2 - Layout and multi-monitor evolution
 - [ ] Per-monitor workspace/view model

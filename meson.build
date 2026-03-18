@@ -21,12 +21,9 @@ inc = include_directories('src', 'include')
 
 xcb_dep = dependency('xcb', required: true)
 xcb_keysyms_dep = dependency('xcb-keysyms', required: true)
-xcb_icccm_dep = dependency('xcb-icccm', required: false)
+xcb_icccm_dep = dependency('xcb-icccm', required: true)
 
-deps = [xcb_dep, xcb_keysyms_dep]
-if xcb_icccm_dep.found()
-  deps += xcb_icccm_dep
-endif
+deps = [xcb_dep, xcb_keysyms_dep, xcb_icccm_dep]
 
 scrollwm_sources = files(
   'src/main.cpp',
