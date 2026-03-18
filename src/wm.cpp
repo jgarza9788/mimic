@@ -1,6 +1,7 @@
 #include "wm.hpp"
 
 #include <X11/keysym.h>
+#include <cerrno>
 #include <unistd.h>
 
 #include <algorithm>
@@ -216,6 +217,13 @@ void WM::setup_keys() {
   add_binding(config_.bindings.reorder_next, KeyBinding::Action::ReorderNext);
   add_binding(config_.bindings.reorder_prev, KeyBinding::Action::ReorderPrev);
   add_binding(config_.bindings.toggle_fullscreen, KeyBinding::Action::ToggleFullscreen);
+  for (const auto& exec_binding : config_.exec_bindings) {
+    if (auto parsed = parse_keybinding(exec_binding.key, KeyBinding::Action::ExecCommand);
+        parsed.has_value()) {
+      parsed->command = exec_binding.command;
+      bindings_.push_back(*parsed);
+    }
+  }
 
   for (const auto& binding : bindings_) {
     xcb_keycode_t* keycodes = xcb_key_symbols_get_keycode(key_symbols_, binding.keysym);
@@ -371,6 +379,9 @@ void WM::handle_key_press(const xcb_key_press_event_t& event) {
         break;
       case KeyBinding::Action::ToggleFullscreen:
         toggle_focused_fullscreen();
+        break;
+      case KeyBinding::Action::ExecCommand:
+        spawn_command(binding.command);
         break;
     }
     return;
@@ -760,10 +771,17 @@ void WM::spawn_command(const std::string& cmd) const {
     return;
   }
 
-  if (fork() == 0) {
+  const pid_t pid = fork();
+  if (pid == 0) {
     setsid();
     execl("/bin/sh", "sh", "-c", cmd.c_str(), static_cast<char*>(nullptr));
+    util::log(util::LogLevel::Error,
+              "failed to exec command '" + cmd + "': " + std::strerror(errno));
     _exit(127);
+  }
+  if (pid < 0) {
+    util::log(util::LogLevel::Error,
+              "failed to fork for command '" + cmd + "': " + std::strerror(errno));
   }
 }
 

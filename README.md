@@ -99,6 +99,7 @@ exec scrollwm-session
 - `Mod+Space`: toggle layout direction (horizontal/vertical) at runtime
 - `Mod+Shift+j` / `Mod+Shift+k`: reorder focused window in scroll order
 - `Mod+f`: toggle fullscreen on focused tiled window (with restore)
+- `[[exec]]`: bind arbitrary shell commands to keys (for launchers, lock scripts, etc.)
 
 ## Config
 
@@ -116,6 +117,7 @@ Configuration sections currently parsed:
 - `[appearance]`: `gap`, `border_width`, `outer_padding`
 - `[autostart]`: `launch_picom`, `compositor`
 - `[bindings]`: includes dynamic `workspace_N` / `move_to_workspace_N` entries for any workspace index `N >= 1`
+- `[[exec]]`: repeated array-of-tables entries with `key` + `command` for arbitrary shell execution
 
 See [`config/config.toml.example`](config/config.toml.example).
 

@@ -38,8 +38,10 @@ class WM {
       ReorderNext,
       ReorderPrev,
       ToggleFullscreen,
+      ExecCommand,
     } action;
     int workspace_idx = -1;
+    std::string command;
   };
 
   struct SizeConstraints {
