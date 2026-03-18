@@ -972,7 +972,13 @@ std::optional<WM::KeyBinding> WM::parse_keybinding(const std::string& combo,
     return std::nullopt;
   }
 
-  return KeyBinding{.modifiers = modifiers, .keysym = keysym, .action = action};
+  return KeyBinding{
+      .modifiers = modifiers,
+      .keysym = keysym,
+      .action = action,
+      .workspace_idx = -1,
+      .command = {},
+  };
 }
 
 }  // namespace scrollwm
