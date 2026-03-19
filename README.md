@@ -22,11 +22,26 @@ ScrollWM is an experimental scrollable tiling window manager for X11/XLibre, ins
 - `xcb`
 - `xcb-keysyms`
 
-Example packages (Debian/Ubuntu style):
+### Example packages 
+    
+**Debian/Ubuntu**
 
 ```bash
 sudo apt install build-essential meson ninja-build libxcb1-dev libxcb-keysyms1-dev
 ```
+
+**Fedora**
+
+```bash id="m2q8tn"
+sudo dnf install libX11-devel libXrandr-devel libXinerama-devel libXext-devel pixman-devel pcre2-devel libev-devel xorg-x11-proto-devel
+```
+
+**CachyOS/Arch**
+
+```bash id="r5w1lx"
+sudo pacman -S --needed libx11 libxrandr libxinerama libxext pixman pcre2 libev xorgproto
+```
+
 
 ## Build
 
