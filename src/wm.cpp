@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -90,10 +91,19 @@ constexpr std::array<uint16_t, 4> kIgnoredLocks = {
     static_cast<uint16_t>(XCB_MOD_MASK_LOCK | XCB_MOD_MASK_2),
 };
 
+config::Config load_config_with_diagnostics() {
+  const auto path = config::default_config_path();
+  if (!std::filesystem::exists(path)) {
+    util::log(util::LogLevel::Warn,
+              "config file not found at " + path.string() + "; using built-in defaults");
+  }
+  return config::load_from_path(path);
+}
+
 }  // namespace
 
 WM::WM()
-    : config_(config::load_from_path(config::default_config_path())),
+    : config_(load_config_with_diagnostics()),
       layout_engine_(config_.layout_direction) {
   for (int i = 0; i < config_.workspace_count; ++i) {
     workspaces_.emplace_back(i);
@@ -121,7 +131,14 @@ int WM::run() {
 
 bool WM::setup() {
   if (!connection_.valid()) {
-    util::log(util::LogLevel::Error, "failed to open X11 connection");
+    const char* display_env = std::getenv("DISPLAY");
+    if (display_env == nullptr || std::string(display_env).empty()) {
+      util::log(util::LogLevel::Error,
+                "DISPLAY is not set; start an X server (startx or display manager) before launching scrollwm");
+    } else {
+      util::log(util::LogLevel::Error, "failed to connect to X server on DISPLAY=" + std::string(display_env));
+    }
+    util::log(util::LogLevel::Error, connection_.error_message());
     return false;
   }
 
@@ -353,8 +370,20 @@ void WM::handle_key_press(const xcb_key_press_event_t& event) {
         focus_prev();
         break;
       case KeyBinding::Action::SpawnTerminal:
-        spawn_command(config_.terminal);
+      {
+        const std::string terminal_cmd = config::resolve_terminal_command(config_.terminal);
+        if (terminal_cmd.empty()) {
+          util::log(util::LogLevel::Error,
+                    "no terminal emulator found; install one of: xterm, kitty, alacritty, foot, x-terminal-emulator");
+        } else {
+          if (terminal_cmd != config_.terminal) {
+            util::log(util::LogLevel::Warn,
+                      "configured terminal '" + config_.terminal + "' not found; using fallback '" + terminal_cmd + "'");
+          }
+          spawn_command(terminal_cmd);
+        }
         break;
+      }
       case KeyBinding::Action::CloseFocused:
         kill_focused();
         break;

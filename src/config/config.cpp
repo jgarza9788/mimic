@@ -4,10 +4,13 @@
 #include <charconv>
 #include <cctype>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
+#include <unistd.h>
 
 namespace scrollwm::config {
 
@@ -71,6 +74,29 @@ std::optional<int> parse_positive_int(const std::string& value) {
   return parsed;
 }
 
+std::optional<int> parse_int(const std::string& value) {
+  int parsed = 0;
+  const auto* begin = value.data();
+  const auto* end = value.data() + value.size();
+  const auto [ptr, ec] = std::from_chars(begin, end, parsed);
+  if (ec != std::errc() || ptr != end) {
+    return std::nullopt;
+  }
+  return parsed;
+}
+
+std::string first_command_token(const std::string& command) {
+  const auto trimmed = trim(command);
+  if (trimmed.empty()) {
+    return {};
+  }
+  const auto first_space = trimmed.find_first_of(" \t");
+  if (first_space == std::string::npos) {
+    return trimmed;
+  }
+  return trimmed.substr(0, first_space);
+}
+
 }  // namespace
 
 std::string Config::BindingSet::workspace_binding(int one_based_index) const {
@@ -123,6 +149,56 @@ std::filesystem::path default_config_path() {
   return std::filesystem::path(home) / ".config" / "scrollwm" / "config.toml";
 }
 
+std::vector<std::string> terminal_fallback_candidates() {
+  return {
+      "xterm",
+      "kitty",
+      "alacritty",
+      "foot",
+      "x-terminal-emulator",
+  };
+}
+
+bool command_exists_in_path(const std::string& command) {
+  const std::string token = first_command_token(command);
+  if (token.empty()) {
+    return false;
+  }
+
+  std::filesystem::path cmd_path(token);
+  if (cmd_path.is_absolute() || token.find('/') != std::string::npos) {
+    return ::access(cmd_path.c_str(), X_OK) == 0;
+  }
+
+  const char* path_env = std::getenv("PATH");
+  if (path_env == nullptr) {
+    return false;
+  }
+
+  std::stringstream path_stream(path_env);
+  std::string dir;
+  while (std::getline(path_stream, dir, ':')) {
+    std::filesystem::path candidate = std::filesystem::path(dir) / token;
+    if (::access(candidate.c_str(), X_OK) == 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+std::string resolve_terminal_command(const std::string& configured_terminal) {
+  if (command_exists_in_path(configured_terminal)) {
+    return configured_terminal;
+  }
+  for (const auto& fallback : terminal_fallback_candidates()) {
+    if (command_exists_in_path(fallback)) {
+      return fallback;
+    }
+  }
+  return {};
+}
+
 Config load_from_path(const std::filesystem::path& path) {
   Config cfg = load_default();
 
@@ -173,19 +249,29 @@ Config load_from_path(const std::filesystem::path& path) {
     if (qualified_key == "general.mod_key") {
       cfg.mod_key = strip_quotes(raw_value);
     } else if (qualified_key == "schema.version") {
-      cfg.schema_version = std::stoi(raw_value);
+      if (auto parsed = parse_int(raw_value); parsed.has_value()) {
+        cfg.schema_version = *parsed;
+      }
     } else if (qualified_key == "general.workspace_count") {
-      cfg.workspace_count = std::stoi(raw_value);
+      if (auto parsed = parse_int(raw_value); parsed.has_value()) {
+        cfg.workspace_count = *parsed;
+      }
     } else if (qualified_key == "general.focus_follows_mouse") {
       cfg.focus_follows_mouse = to_bool(raw_value);
     } else if (qualified_key == "layout.layout_direction") {
       cfg.layout_direction = to_direction(strip_quotes(raw_value));
     } else if (qualified_key == "appearance.gap") {
-      cfg.gap = std::stoi(raw_value);
+      if (auto parsed = parse_int(raw_value); parsed.has_value()) {
+        cfg.gap = *parsed;
+      }
     } else if (qualified_key == "appearance.border_width") {
-      cfg.border_width = std::stoi(raw_value);
+      if (auto parsed = parse_int(raw_value); parsed.has_value()) {
+        cfg.border_width = *parsed;
+      }
     } else if (qualified_key == "appearance.outer_padding") {
-      cfg.outer_padding = std::stoi(raw_value);
+      if (auto parsed = parse_int(raw_value); parsed.has_value()) {
+        cfg.outer_padding = *parsed;
+      }
     } else if (qualified_key == "general.terminal") {
       cfg.terminal = strip_quotes(raw_value);
     } else if (qualified_key == "autostart.compositor") {

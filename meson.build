@@ -20,10 +20,11 @@ add_project_arguments([
 inc = include_directories('src')
 
 xcb_dep = dependency('xcb', required: true)
+xcb_util_dep = dependency('xcb-util', required: true)
 xcb_keysyms_dep = dependency('xcb-keysyms', required: true)
 xcb_icccm_dep = dependency('xcb-icccm', required: true)
 
-deps = [xcb_dep, xcb_keysyms_dep, xcb_icccm_dep]
+deps = [xcb_dep, xcb_util_dep, xcb_keysyms_dep, xcb_icccm_dep]
 
 scrollwm_sources = files(
   'src/main.cpp',
@@ -59,8 +60,18 @@ scrollwm_unit_tests = executable('scrollwm-unit-tests',
   dependencies: [xcb_dep],
 )
 test('scrollwm-unit-tests', scrollwm_unit_tests)
+test('scrollwm-session-wrapper-test',
+  find_program('sh'),
+  args: [files('tests/session_wrapper_test.sh'), meson.project_source_root()]
+)
 
-install_data('assets/xsessions/scrollwm.desktop',
+scrollwm_desktop = configure_file(
+  input: 'assets/xsessions/scrollwm.desktop.in',
+  output: 'scrollwm.desktop',
+  configuration: {'bindir': get_option('bindir')}
+)
+
+install_data(scrollwm_desktop,
   install_dir: join_paths(get_option('datadir'), 'xsessions')
 )
 

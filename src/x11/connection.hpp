@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include <xcb/xcb.h>
 
@@ -15,6 +16,8 @@ class Connection {
   Connection& operator=(const Connection&) = delete;
 
   bool valid() const;
+  int error_code() const;
+  std::string error_message() const;
   xcb_connection_t* raw() const;
   xcb_screen_t* screen() const;
 
