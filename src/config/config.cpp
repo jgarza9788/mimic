@@ -191,10 +191,12 @@ std::string resolve_terminal_command(const std::string& configured_terminal) {
   if (command_exists_in_path(configured_terminal)) {
     return configured_terminal;
   }
-  for (const auto& fallback : terminal_fallback_candidates()) {
-    if (command_exists_in_path(fallback)) {
-      return fallback;
-    }
+  const auto fallbacks = terminal_fallback_candidates();
+  const auto fallback_it = std::find_if(fallbacks.begin(), fallbacks.end(), [](const auto& fallback) {
+    return command_exists_in_path(fallback);
+  });
+  if (fallback_it != fallbacks.end()) {
+    return *fallback_it;
   }
   return {};
 }
