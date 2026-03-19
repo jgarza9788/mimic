@@ -83,7 +83,7 @@ This installs:
 The installed desktop entry points to:
 
 ```text
-Exec=scrollwm-session
+Exec=scrollwm-session --wait-for-wm=10
 ```
 
 `scrollwm-session` can read `~/.config/scrollwm/config.toml` and optionally launch picom when:
@@ -94,7 +94,7 @@ launch_picom = true
 compositor = "picom --experimental-backends"
 ```
 
-Then it execs `scrollwm`.
+Then it launches `scrollwm` (with optional retry support via `--wait-for-wm`).
 
 ## startx usage
 

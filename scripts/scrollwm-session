@@ -2,6 +2,50 @@
 set -eu
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/scrollwm/config.toml"
+WAIT_FOR_WM_SECONDS=0
+
+usage() {
+  cat <<'EOF'
+Usage: scrollwm-session [--wait-for-wm[=SECONDS]]
+
+Options:
+  --wait-for-wm         Retry for up to 10 seconds if another WM owns X11.
+  --wait-for-wm=SECONDS Retry for up to SECONDS.
+EOF
+}
+
+parse_wait_seconds() {
+  case "$1" in
+    ''|*[!0-9]*)
+      echo "scrollwm-session: invalid --wait-for-wm value: $1" >&2
+      exit 2
+      ;;
+    *)
+      WAIT_FOR_WM_SECONDS="$1"
+      ;;
+  esac
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --wait-for-wm)
+      WAIT_FOR_WM_SECONDS=10
+      ;;
+    --wait-for-wm=*)
+      parse_wait_seconds "${1#*=}"
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "scrollwm-session: unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 if [ -f "$CONFIG_FILE" ]; then
   PICOM_CMD=$(awk -F'=' '/^\s*compositor\s*=/{gsub(/^[ \t]+|[ \t]+$/, "", $2); gsub(/^"|"$/, "", $2); print $2}' "$CONFIG_FILE" | tail -n1 || true)
@@ -11,4 +55,28 @@ if [ -f "$CONFIG_FILE" ]; then
   fi
 fi
 
-exec scrollwm
+if [ "$WAIT_FOR_WM_SECONDS" -eq 0 ]; then
+  exec scrollwm
+fi
+
+attempt=0
+while :; do
+  ERR_FILE=$(mktemp)
+  if scrollwm 2>"$ERR_FILE"; then
+    rm -f "$ERR_FILE"
+    exit 0
+  fi
+
+  rc=$?
+  if grep -q "could not acquire WM ownership" "$ERR_FILE" && [ "$attempt" -lt "$WAIT_FOR_WM_SECONDS" ]; then
+    attempt=$((attempt + 1))
+    echo "scrollwm-session: waiting for existing WM to exit (${attempt}/${WAIT_FOR_WM_SECONDS})" >&2
+    rm -f "$ERR_FILE"
+    sleep 1
+    continue
+  fi
+
+  cat "$ERR_FILE" >&2
+  rm -f "$ERR_FILE"
+  exit "$rc"
+done
