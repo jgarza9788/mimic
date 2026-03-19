@@ -3,10 +3,21 @@
 scrollwm-session \- session wrapper for ScrollWM
 .SH SYNOPSIS
 .B scrollwm-session
+.RI [ --wait-for-wm [= SECONDS ]]
 .SH DESCRIPTION
 .B scrollwm-session
 reads the ScrollWM config file and optionally launches a compositor before execing
 .BR scrollwm .
+.SH OPTIONS
+.TP
+.B --wait-for-wm
+Retries startup for up to 10 seconds when another X11 window manager currently owns
+SubstructureRedirect.
+.TP
+.BI --wait-for-wm= SECONDS
+Retries startup for up to
+.I SECONDS
+before failing.
 .SH CONFIGURATION
 Uses
 .I ~/.config/scrollwm/config.toml
