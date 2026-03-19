@@ -20,11 +20,10 @@ add_project_arguments([
 inc = include_directories('src')
 
 xcb_dep = dependency('xcb', required: true)
-xcb_util_dep = dependency('xcb-util', required: true)
 xcb_keysyms_dep = dependency('xcb-keysyms', required: true)
 xcb_icccm_dep = dependency('xcb-icccm', required: true)
 
-deps = [xcb_dep, xcb_util_dep, xcb_keysyms_dep, xcb_icccm_dep]
+deps = [xcb_dep, xcb_keysyms_dep, xcb_icccm_dep]
 
 scrollwm_sources = files(
   'src/main.cpp',
