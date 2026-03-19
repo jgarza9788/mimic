@@ -55,5 +55,8 @@ struct Config {
 Config load_default();
 Config load_from_path(const std::filesystem::path& path);
 std::filesystem::path default_config_path();
+std::string resolve_terminal_command(const std::string& configured_terminal);
+std::vector<std::string> terminal_fallback_candidates();
+bool command_exists_in_path(const std::string& command);
 
 }  // namespace scrollwm::config

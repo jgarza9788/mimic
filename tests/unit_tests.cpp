@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdlib>
 
 #include "config/config.hpp"
 #include "layout/scroll_layout.hpp"
@@ -169,6 +170,37 @@ bool test_config_clamps_workspace_and_schema_versions() {
         return expect(cfg.workspace_count == 1, "workspace_count should clamp to 1") &&
                expect(cfg.schema_version == 1, "schema version should clamp to 1");
       });
+}
+
+bool test_terminal_resolution_prefers_configured_then_fallback() {
+  const auto temp_root = std::filesystem::temp_directory_path() / "scrollwm-terminal-resolution";
+  std::filesystem::create_directories(temp_root);
+  const auto fake_kitty = temp_root / "kitty";
+  {
+    std::ofstream out(fake_kitty);
+    out << "#!/usr/bin/env sh\nexit 0\n";
+  }
+  std::filesystem::permissions(fake_kitty,
+                               std::filesystem::perms::owner_exec | std::filesystem::perms::owner_read,
+                               std::filesystem::perm_options::add);
+
+  const char* old_path = std::getenv("PATH");
+  setenv("PATH", temp_root.c_str(), 1);
+
+  const std::string configured = scrollwm::config::resolve_terminal_command("kitty");
+  const std::string fallback = scrollwm::config::resolve_terminal_command("xterm");
+  const std::string missing = scrollwm::config::resolve_terminal_command("this-terminal-does-not-exist");
+
+  if (old_path != nullptr) {
+    setenv("PATH", old_path, 1);
+  } else {
+    unsetenv("PATH");
+  }
+  std::filesystem::remove_all(temp_root);
+
+  return expect(configured == "kitty", "configured terminal should be used when present") &&
+         expect(fallback == "kitty", "fallback chain should choose kitty when xterm missing") &&
+         expect(missing == "kitty", "missing configured terminal should still resolve fallback");
 }
 
 bool test_workspace_remove_middle_focused_behavior() {
@@ -627,6 +659,7 @@ int main() {
       {"config exec malformed ignored", test_config_exec_malformed_entries_ignored},
       {"config exec whitespace/comments/unknowns", test_config_exec_whitespace_comments_unknown_sections},
       {"config clamps", test_config_clamps_workspace_and_schema_versions},
+      {"terminal resolution fallback chain", test_terminal_resolution_prefers_configured_then_fallback},
       {"config toggle overview binding", test_config_toggle_overview_binding_parses},
       {"workspace remove middle focused", test_workspace_remove_middle_focused_behavior},
       {"workspace remove only", test_workspace_remove_only_client_clears_focus},

@@ -7,7 +7,7 @@ License:        MIT
 URL:            https://example.com/scrollwm
 Source0:        %{name}-%{version}.tar.gz
 
-BuildRequires:  gcc-c++, meson, ninja-build, pkgconfig(xcb), pkgconfig(xcb-keysyms), pkgconfig(xcb-icccm)
+BuildRequires:  gcc-c++, meson, ninja-build, pkgconfig(xcb), pkgconfig(xcb-util), pkgconfig(xcb-keysyms), pkgconfig(xcb-icccm)
 
 %description
 ScrollWM is a keyboard-first tiling window manager with a scrollable layout,

@@ -3,6 +3,19 @@ set -eu
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/scrollwm/config.toml"
 WAIT_FOR_WM_SECONDS=0
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+find_scrollwm_binary() {
+  if command -v scrollwm >/dev/null 2>&1; then
+    command -v scrollwm
+    return 0
+  fi
+  if [ -x "${SCRIPT_DIR}/scrollwm" ]; then
+    printf '%s\n' "${SCRIPT_DIR}/scrollwm"
+    return 0
+  fi
+  return 1
+}
 
 usage() {
   cat <<'EOF'
@@ -56,13 +69,21 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 if [ "$WAIT_FOR_WM_SECONDS" -eq 0 ]; then
-  exec scrollwm
+  if ! SCROLLWM_BIN=$(find_scrollwm_binary); then
+    echo "scrollwm-session: unable to locate 'scrollwm' in PATH or ${SCRIPT_DIR}" >&2
+    exit 127
+  fi
+  exec "$SCROLLWM_BIN"
 fi
 
 attempt=0
 while :; do
+  if ! SCROLLWM_BIN=$(find_scrollwm_binary); then
+    echo "scrollwm-session: unable to locate 'scrollwm' in PATH or ${SCRIPT_DIR}" >&2
+    exit 127
+  fi
   ERR_FILE=$(mktemp)
-  if scrollwm 2>"$ERR_FILE"; then
+  if "$SCROLLWM_BIN" 2>"$ERR_FILE"; then
     rm -f "$ERR_FILE"
     exit 0
   fi

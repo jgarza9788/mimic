@@ -1,47 +1,80 @@
 # ScrollWM
 
-ScrollWM is an experimental scrollable tiling window manager for X11/XLibre, inspired by Niri's scrolling workspace idea while staying realistic to X11 constraints.
+ScrollWM is an experimental scrollable tiling window manager for X11/Xorg.
 
-## Features in this prototype
+## Dependency matrix (build + runtime)
 
-- Modern C++20 codebase with Meson + Ninja
-- X11 WM skeleton with ownership check (`SubstructureRedirectMask`)
-- Core event handling: map/unmap/destroy/configure/key/focus
-- Scrollable linear layout (horizontal or vertical)
-- Focus navigation (`Mod+j` / `Mod+k`) with viewport shifting
-- Dynamic workspaces with automatic cleanup (empty workspaces are removed while always keeping one alive)
-- Niri-style Overview mode: zoomed-out multi-workspace scene on one monitor
-- Simple TOML config loader (`~/.config/scrollwm/config.toml`)
-- XSessions integration for display managers
-- Optional picom startup via session wrapper and config
+### Build-time requirements
 
-## Build requirements
+- C++20 compiler (`gcc`/`clang`)
+- Meson
+- Ninja
+- pkg-config
+- XCB development libraries:
+  - `xcb`
+  - `xcb-keysyms` (`xcb-util-keysyms`)
+  - `xcb-icccm` (`xcb-util-wm`)
+  - `xcb-util`
 
-- C++20 compiler (gcc/clang)
-- Meson + Ninja
-- `xcb`
-- `xcb-keysyms`
+### Runtime requirements
 
-### Example packages 
-    
-**Debian/Ubuntu**
+- Xorg/X11 server (for example: `xorg`, `xorg-xinit`, display manager stack)
+- `scrollwm` binary and `scrollwm-session` script installed into your prefix
+- At least one terminal emulator (ScrollWM now uses fallback chain on `Mod+Enter`):
+  - `xterm` -> `kitty` -> `alacritty` -> `foot` -> `x-terminal-emulator`
+
+### Optional runtime components
+
+- `picom` (only if you enable `[autostart].launch_picom = true` in config)
+- Display manager package (GDM/SDDM/LightDM) if you want graphical session selection
+
+## Distro package names
+
+### Arch / CachyOS
 
 ```bash
-sudo apt install build-essential meson ninja-build libxcb1-dev libxcb-keysyms1-dev
+sudo pacman -S --needed \
+  base-devel meson ninja pkgconf \
+  libxcb xcb-util xcb-util-keysyms xcb-util-wm \
+  xorg-server xorg-xinit xterm
 ```
 
-**Fedora**
+Optional:
 
-```bash id="m2q8tn"
-sudo dnf install libX11-devel libXrandr-devel libXinerama-devel libXext-devel pixman-devel pcre2-devel libev-devel xorg-x11-proto-devel
+```bash
+sudo pacman -S --needed picom kitty alacritty foot
 ```
 
-**CachyOS/Arch**
+### Fedora
 
-```bash id="r5w1lx"
-sudo pacman -S --needed libx11 libxrandr libxinerama libxext pixman pcre2 libev xorgproto
+```bash
+sudo dnf install \
+  gcc-c++ meson ninja-build pkgconf-pkg-config \
+  libxcb-devel xcb-util-devel xcb-util-keysyms-devel xcb-util-wm-devel \
+  xorg-x11-server-Xorg xorg-x11-xinit xterm
 ```
 
+Optional:
+
+```bash
+sudo dnf install picom kitty alacritty foot
+```
+
+### Ubuntu / Debian
+
+```bash
+sudo apt update
+sudo apt install \
+  build-essential meson ninja-build pkg-config \
+  libxcb1-dev libxcb-util-dev libxcb-keysyms1-dev libxcb-icccm4-dev \
+  xorg xinit xterm
+```
+
+Optional:
+
+```bash
+sudo apt install picom kitty alacritty foot x-terminal-emulator
+```
 
 ## Build
 
@@ -50,9 +83,130 @@ meson setup build
 meson compile -C build
 ```
 
-## One-shot bootstrap (install deps, build, install, test)
+## Install
 
-A helper script is provided for common Linux distributions:
+```bash
+meson install -C build
+```
+
+By default Meson installs to `/usr/local`. For display managers, `/usr` is usually safer:
+
+```bash
+meson setup build --prefix=/usr
+meson compile -C build
+sudo meson install -C build
+```
+
+## Launch methods
+
+### 1) `startx`
+
+In `~/.xinitrc`:
+
+```sh
+exec scrollwm-session
+```
+
+Then run:
+
+```bash
+startx
+```
+
+### 2) Display managers (GDM/SDDM/LightDM)
+
+- Install ScrollWM system-wide.
+- Confirm desktop entry exists in `/usr/share/xsessions/scrollwm.desktop` (or your prefix equivalent).
+- Select **ScrollWM** from the session chooser and log in.
+
+The installed desktop entry now uses an absolute `Exec=` path matching your Meson `bindir`, so `/usr/local` installs are no longer hidden by a minimal DM `PATH`.
+
+## Configuration
+
+Default config path:
+
+```text
+~/.config/scrollwm/config.toml
+```
+
+Copy sample:
+
+```bash
+mkdir -p ~/.config/scrollwm
+cp /usr/share/doc/scrollwm/config.toml.example ~/.config/scrollwm/config.toml
+```
+
+If no config exists, ScrollWM starts with built-in defaults and logs a warning.
+
+## Troubleshooting
+
+### Black screen / immediate return to greeter
+
+- Check session logs (display manager journal, `~/.xsession-errors`, etc.).
+- Verify Xorg is available and `DISPLAY` is set in session.
+- Run `scrollwm` from an X terminal to inspect startup logs directly.
+
+### `could not acquire WM ownership`
+
+Another WM is still running on the same X display. Use:
+
+```bash
+scrollwm-session --wait-for-wm=10
+```
+
+The session wrapper retries and prints progress while waiting.
+
+### Missing terminal on `Mod+Enter`
+
+ScrollWM logs an actionable error if no terminal is found. Install one of:
+`xterm`, `kitty`, `alacritty`, `foot`, or `x-terminal-emulator`.
+
+### Missing session entry in login screen
+
+- Verify installation prefix and desktop file location.
+- Reinstall with `--prefix=/usr` if your DM does not include `/usr/local` session paths.
+- Confirm desktop file references a valid `Exec` target.
+
+### Dependency mismatch / build failure
+
+Use pkg-config checks:
+
+```bash
+pkg-config --modversion xcb xcb-keysyms xcb-icccm xcb-util
+```
+
+If any module is missing, install the corresponding `-dev`/`-devel` package from your distro matrix above.
+
+## Verification commands
+
+After install, run:
+
+```bash
+# Binary linkage
+ldd "$(command -v scrollwm)"
+
+# Session entry installed where expected
+ls -l /usr/share/xsessions/scrollwm.desktop
+
+# Validate desktop entry Exec path
+grep '^Exec=' /usr/share/xsessions/scrollwm.desktop
+
+# Ensure X11 environment exists in current shell
+printf 'DISPLAY=%s\n' "${DISPLAY:-<unset>}"
+
+# Detect likely running WM owners/processes
+xprop -root _NET_SUPPORTING_WM_CHECK _NET_WM_NAME
+ps -ef | grep -E 'i3|bspwm|openbox|xfwm4|kwin_x11|mutter|scrollwm' | grep -v grep
+```
+
+## Tests and validation
+
+```bash
+meson test -C build --print-errorlogs
+./scripts/validate-config-schema.py config/config.toml.example
+```
+
+## One-shot bootstrap
 
 ```bash
 ./scripts/bootstrap-build-install-test.sh
@@ -62,123 +216,6 @@ Environment overrides:
 
 - `PREFIX` (default `/usr/local`)
 - `BUILD_DIR` (default `build`)
-
-## Install
-
-```bash
-meson install -C build
-```
-
-This installs:
-
-- `scrollwm` binary to `${prefix}/bin`
-- `scrollwm-session` wrapper to `${prefix}/bin`
-- `scrollwm.desktop` to `${datadir}/xsessions`
-- docs and sample config under `${datadir}/doc/scrollwm`
-
-> For display-manager visibility (GDM/SDDM), install with a system prefix such as `/usr` so the desktop file lands in `/usr/share/xsessions`.
-
-## Session startup and display managers
-
-The installed desktop entry points to:
-
-```text
-Exec=scrollwm-session --wait-for-wm=10
-```
-
-`scrollwm-session` can read `~/.config/scrollwm/config.toml` and optionally launch picom when:
-
-```toml
-[autostart]
-launch_picom = true
-compositor = "picom --experimental-backends"
-```
-
-Then it launches `scrollwm` (with optional retry support via `--wait-for-wm`).
-
-## startx usage
-
-In `~/.xinitrc`:
-
-```sh
-exec scrollwm-session
-```
-
-## Default keybindings
-
-- `Mod+Enter`: launch terminal
-- `Mod+j`: focus next
-- `Mod+k`: focus previous
-- `Mod+1..4`: switch workspace (defaults; missing target workspaces are created on demand)
-- `Mod+q`: close focused window (WM_DELETE_WINDOW)
-- `Mod+Shift+e`: exit ScrollWM
-- `Mod+Space`: toggle layout direction (horizontal/vertical) at runtime
-- `Mod+Shift+j` / `Mod+Shift+k`: reorder focused window in scroll order
-- `Mod+f`: toggle fullscreen on focused tiled window (with restore)
-- `Mod+Tab`: toggle overview (zoomed-out camera showing all workspaces)
-- `Return` (while in overview): activate selected window/workspace and exit overview
-- `[[exec]]`: bind arbitrary shell commands to keys (for launchers, lock scripts, etc.)
-
-## Config
-
-Copy the sample config:
-
-```bash
-mkdir -p ~/.config/scrollwm
-cp /usr/share/doc/scrollwm/config.toml.example ~/.config/scrollwm/config.toml
-```
-
-Configuration sections currently parsed:
-
-- `[general]`: `mod_key`, `workspace_count`, `focus_follows_mouse`, `terminal` (`workspace_count` is initial workspace count)
-- `[layout]`: `layout_direction`
-- `[appearance]`: `gap`, `border_width`, `outer_padding`
-- `[autostart]`: `launch_picom`, `compositor`
-- `[bindings]`: includes dynamic `workspace_N` / `move_to_workspace_N` entries for any workspace index `N >= 1`, plus `toggle_overview` and `activate_overview`
-- `[[exec]]`: repeated array-of-tables entries with `key` + `command` for arbitrary shell execution
-
-See [`config/config.toml.example`](config/config.toml.example).
-
-## Testing
-
-Run unit tests after building:
-
-```bash
-meson test -C build --print-errorlogs
-```
-
-Validate configuration schema:
-
-```bash
-./scripts/validate-config-schema.py config/config.toml.example
-```
-
-## Packaging scaffolding
-
-Starter distro packaging metadata lives in [`packaging/`](packaging/):
-
-- Debian/Ubuntu scaffold: `packaging/debian/`
-- RPM scaffold: `packaging/rpm/scrollwm.spec`
-
-## CI + static analysis
-
-GitHub Actions CI is defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and runs:
-
-- Meson configure/build
-- Unit tests
-- Config schema validation
-- `cppcheck` static analysis
-
-## Man pages and operations docs
-
-- `docs/man/scrollwm.1`
-- `docs/man/scrollwm-session.1`
-- `docs/config-schema.md`
-- `docs/demo-and-troubleshooting.md`
-
-## Development roadmap
-
-See [docs/milestones.md](docs/milestones.md).
 
 ## License
 

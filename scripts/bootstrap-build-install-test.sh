@@ -31,6 +31,7 @@ install_requirements() {
       ninja-build \
       pkg-config \
       libxcb1-dev \
+      libxcb-util-dev \
       libxcb-keysyms1-dev \
       libxcb-icccm4-dev \
       libx11-dev \
@@ -47,6 +48,7 @@ install_requirements() {
       ninja-build \
       pkgconf-pkg-config \
       libxcb-devel \
+      xcb-util-devel \
       xcb-util-keysyms-devel \
       xcb-util-wm-devel \
       libX11-devel \
@@ -63,8 +65,10 @@ install_requirements() {
       ninja \
       pkgconf \
       libxcb \
+      xcb-util \
       xcb-util-keysyms \
       xcb-util-wm \
+      xorg-server \
       libx11 \
       xterm \
       picom \
