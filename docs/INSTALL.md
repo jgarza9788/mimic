@@ -28,3 +28,18 @@ Installed artifacts:
 - `/usr/local/bin/mimic`
 - `/usr/local/share/xsessions/mimic.desktop`
 - `/usr/local/share/mimic/examples/mimic.keys`
+
+## One-command system install
+
+To build and install Mimic with display-manager/session setup and default config provisioning:
+
+```bash
+sudo ./scripts/build_install.sh --prefix /usr/local --sysconfdir /etc
+```
+
+What this command does:
+- configures + builds the app
+- runs tests (unless `--skip-tests`)
+- installs `mimic` into `<prefix>/bin`
+- installs `mimic.desktop` for display managers in `<prefix>/share/xsessions` and also `/usr/share/xsessions` when writable
+- creates `/etc/xdg/mimic/mimic.keys` if it does not exist
