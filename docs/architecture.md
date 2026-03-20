@@ -1,29 +1,46 @@
-# Mimic first-wave architecture
+# Mimic architecture
 
-The first wave introduces separable modules so scrolling behavior can be added incrementally without scattering logic.
+## Runtime overview
 
-## Modules
+V001 now includes a minimal live X11 WM lifecycle:
+
+1. Startup parses command bindings from config search paths.
+2. Connects to X with `XOpenDisplay`.
+3. Attempts to claim WM control on root (`SubstructureRedirectMask`).
+4. Registers key grabs from `MimicCommandRegistry`.
+5. Scans existing mapped windows and manages them.
+6. Runs a persistent X event loop.
+
+## Core modules in live path
 
 ## `MimicCommandRegistry`
-- Parses command-binding lines (`bind <combo> exec <command>`)
-- Stores validated bindings and supports lookup by key combo
-- Designed to become adapter-backed for TOML or legacy format parsers
+- Parses `bind <combo> exec <command>`
+- Stores bindings used to register root key grabs
+- Dispatches commands when matching `KeyPress` arrives
 
 ## `MimicWorkspaceModel`
-- Owns workspace list and active workspace index
-- Encapsulates policy: remove empty workspace only if total workspaces > 1
-- Guarantees startup invariant of at least one workspace
+- Maintains workspace list + active workspace index
+- Preserves invariant: at least one workspace always exists
+- Tracks per-workspace window counts when clients map/unmap
 
-## `MimicLayoutEngine` and `MimicViewport`
-- Holds ordered windows per workspace slice
-- Provides next/previous focus navigation in order
-- Tracks viewport offset (`offset_x`, `offset_y`) as basis for virtual scrolling strip
+## `MimicLayoutEngine` / `MimicViewport`
+- Tracks ordered windows for active workspace
+- Maintains focus iteration state
+- Applies deterministic tiling-like layout in runtime
+- Viewport offsets are now part of real layout application path
 
 ## `MimicOverviewController`
-- Dedicated overview state machine (`Inactive`/`Active`)
-- Builds simple grid tiles for visible windows
-- Handles pick-to-focus and clean exit transition
+- Keeps overview state machine and tile metadata model
+- Receives live managed-window metadata when active
+- Ready for future visible overview rendering path
 
-## Integration status
+## X11 event handling scope
 
-Current `main.cpp` wires construction/bootstrap and config parsing with dry-mode behavior when no X server is available. Full X event-loop integration is intentionally left as a focused TODO.
+Current handled events:
+- `MapRequest`
+- `ConfigureRequest`
+- `DestroyNotify`
+- `UnmapNotify`
+- `KeyPress`
+
+This is intentionally minimal but forms a real WM session base for future Fluxbox-derived behavior.
