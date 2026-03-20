@@ -1,29 +1,35 @@
 # Mimic
 
-Mimic is an X11/Xlib C++ window manager project that is **intended to be a Fluxbox-derived fork** and evolve toward a Niri-style scrolling UX on X11.
+Mimic is now a **minimally working X11 window manager runtime** built with Xlib and C++.
 
-> Note: in this environment, direct upstream cloning from GitHub was blocked, so this repository currently contains a clean Mimic-first bootstrap scaffold and architecture slices for the first wave.
+It is still early-stage, but V001 now runs as a real WM process: it connects to X, claims the WM role, enters an event loop, manages top-level windows, applies a deterministic layout, and dispatches `exec` key bindings.
 
-## Current status (first wave)
+## What works now
 
-Implemented now:
-- `mimic` binary target and `Mimic` X session file (`sessions/mimic.desktop`)
-- first-wave architecture modules:
-  - `MimicViewport`
+- Real X11 startup path (`XOpenDisplay`, root acquisition, WM conflict detection).
+- Root `SubstructureRedirectMask` claim with clean error handling when another WM is active.
+- Stable event loop with handling for:
+  - `MapRequest`
+  - `ConfigureRequest`
+  - `DestroyNotify`
+  - `UnmapNotify`
+  - `KeyPress`
+- Basic top-level client management (no full reparenting yet).
+- Deterministic layout applied to managed windows on the active workspace.
+- Existing Mimic architecture is wired into runtime:
   - `MimicWorkspaceModel`
-  - `MimicLayoutEngine`
+  - `MimicLayoutEngine` + `MimicViewport`
   - `MimicOverviewController`
   - `MimicCommandRegistry`
-- exec command binding parser/registry (`bind <key> exec <command>`)
-- dynamic workspace policy with invariant: at least one workspace always remains
-- overview mode state machine skeleton with grid preview tiling metadata
-- unit tests for parser, workspace policy, and overview transitions
+- Config search path logic with graceful fallback and parse diagnostics.
+- Foreground stderr logs + runtime log file (`$XDG_RUNTIME_DIR/mimic.log` or `/tmp/mimic.log`).
 
-Experimental / not complete yet:
-- full Fluxbox event loop integration
-- real window reparenting/management behavior
-- full scrolling-strip layout + animations
-- TOML configuration parser
+## What is still incomplete
+
+- No full Fluxbox-level reparenting/decorations.
+- No advanced workspace navigation commands yet.
+- Overview controller is stateful and connected, but not yet rendered visually.
+- Scrolling-strip UX remains future work.
 
 ## Build
 
@@ -33,49 +39,87 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-## One-command build + install
-
-Use the helper to build, test, install, create display-manager session entries (GDM + SDDM), place the executable, and provision a default system config:
+## Install
 
 ```bash
-sudo ./scripts/build_install.sh --prefix /usr/local --sysconfdir /etc
+cmake --install build --prefix /usr/local
 ```
 
-If you do not want tests in this step, add `--skip-tests`.
+Installed artifacts:
+- `/usr/local/bin/mimic`
+- `/usr/local/share/xsessions/mimic.desktop`
+- `/usr/local/share/mimic/examples/mimic.keys`
 
-## Run
+## Run from TTY (`xinit`)
 
-```bash
-./build/mimic [optional/path/to/mimic.keys]
-```
-
-If no X server is available, Mimic runs in dry mode and prints registry/workspace bootstrap status.
-
-## Config location and example
-
-For now, a sample key file is included at:
-- `config/mimic.keys`
-
-Example safe commands:
-- `bind Mod4+Return exec xterm`
-- `bind Mod4+d exec dmenu_run`
-
-## Running under xinit / display managers
-
-- Install the project (`cmake --install build`) to place:
-  - `mimic` in `bin`
-  - `mimic.desktop` in `share/xsessions`
-- Then select **Mimic** from your DM session chooser.
-
-For `xinit`, you can use:
+Use `~/.xinitrc`:
 
 ```bash
 exec mimic
 ```
 
+Then start X:
+
+```bash
+startx
+```
+
+## Session entry for display managers
+
+Install and then select **Mimic** from GDM/SDDM/etc. The desktop file is:
+- `sessions/mimic.desktop` (`Exec=mimic`, `Name=Mimic`)
+
+## Config file search order
+
+Mimic checks, in order:
+1. explicit CLI path (`mimic /path/to/mimic.keys`)
+2. `$XDG_CONFIG_HOME/mimic/mimic.keys`
+3. `~/.config/mimic/mimic.keys`
+4. `/etc/xdg/mimic/mimic.keys`
+5. `/usr/local/share/mimic/examples/mimic.keys`
+6. `/usr/share/mimic/examples/mimic.keys`
+
+Syntax:
+
+```txt
+bind Mod4+Return exec xterm
+bind Mod4+d exec dmenu_run
+```
+
+## Logging and diagnostics
+
+Startup logs include:
+- X connection status
+- WM root claim status
+- config path used
+- loaded exec binding count
+- dry mode vs real WM mode
+
+If no X server exists, Mimic runs dry mode and logs bootstrap state.
+
+## Troubleshooting
+
+### "Mimic initialized with 0 exec bindings"
+That old scaffold behavior has been replaced. If you still have zero bindings, Mimic now logs where it searched and whether it found a config.
+
+### "Another window manager is already running"
+Mimic detected `BadAccess` while trying to claim `SubstructureRedirectMask` on the root window. Exit the existing WM or start Mimic in a fresh X session.
+
+### "Mimic exits immediately"
+Check stderr and `mimic.log` for:
+- failed X connection
+- WM conflict on root
+- fatal X protocol errors
+
+### "No session entry appears in GDM/SDDM"
+Verify installation of `mimic.desktop` into your active `xsessions` directory (commonly `/usr/share/xsessions` or `/usr/local/share/xsessions`).
+
+### "No config file found"
+Mimic continues with defaults. Create `~/.config/mimic/mimic.keys` and add `bind ... exec ...` lines.
+
 ## Documentation
 
-- `docs/forking-from-fluxbox.md`
+- `docs/INSTALL.md`
 - `docs/architecture.md`
 - `docs/roadmap.md`
-- `docs/INSTALL.md`
+- `docs/forking-from-fluxbox.md`

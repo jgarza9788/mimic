@@ -1,20 +1,20 @@
 # Mimic roadmap
 
-## Milestone 1 (current)
-- Mimic identity bootstrap
-- First-wave architecture classes
-- Exec bindings parser + registration
-- Dynamic workspace minimum-one policy
-- Overview mode skeleton
-- Unit tests for critical policies and state transitions
+## Milestone 1 (completed)
+- Mimic identity/bootstrap
+- Core architecture modules (`WorkspaceModel`, `LayoutEngine`, `OverviewController`, `CommandRegistry`)
+- Config parser for `bind ... exec ...`
+- Live X11 WM runtime with root claim + event loop + basic client management
 
-## Milestone 2 (recommended next)
-- Import upstream Fluxbox code and build flow intact
-- Bridge Mimic modules into real window/workspace event processing
-- Add command execution dispatch on keypress events
-- Persist config in `$XDG_CONFIG_HOME/mimic/` with compatibility fallback
+## Milestone 2 (next recommended)
+- Multi-workspace switching commands + key bindings
+- EWMH basics (`_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`, etc.)
+- Better focus model and pointer/enter interactions
+- More robust client state transitions and edge-case handling
+- Early integration points for Fluxbox-derived behavior
 
 ## Milestone 3
-- Introduce scrolling strip workspace layout (virtual coordinates + panning)
-- Improve overview rendering and keyboard/mouse selection
-- Add regression tests for workspace churn and focus transitions
+- Reparent/decorations where needed
+- Scrolling strip workspace UX and smooth viewport motion
+- Visual overview rendering and interaction
+- Stronger runtime/integration tests (Xephyr/Xvfb-based)

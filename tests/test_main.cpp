@@ -35,6 +35,8 @@ void register_test(const std::string& name, std::function<void()> fn) {
   } while (false)
 
 #include "test_command_registry.cpp"
+#include "test_config.cpp"
+#include "test_layout_engine.cpp"
 #include "test_workspace_model.cpp"
 #include "test_overview_controller.cpp"
 

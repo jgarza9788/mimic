@@ -9,6 +9,7 @@ find_package(X11 REQUIRED)
 
 add_library(mimic_core
     src/MimicCommandRegistry.cpp
+    src/MimicConfig.cpp
     src/MimicWorkspaceModel.cpp
     src/MimicLayoutEngine.cpp
     src/MimicOverviewController.cpp
