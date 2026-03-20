@@ -356,6 +356,8 @@ int main(int argc, char** argv) {
       {"/etc/xdg/mimic/mimic.keys", "/usr/local/share/mimic/examples/mimic.keys", "/usr/share/mimic/examples/mimic.keys"},
   });
 
+  log_line("Mimic: startup begin.");
+
   const auto config_path = mimic::first_existing_path(candidates);
   if (config_path) {
     std::ifstream config(*config_path);
@@ -370,6 +372,7 @@ int main(int argc, char** argv) {
     log_line("Mimic: no config file found; continuing with defaults and 0 bindings.");
   }
 
+  log_line("Mimic: attempting to open X display.");
   Display* display = XOpenDisplay(nullptr);
   if (display == nullptr) {
     log_line("Mimic: unable to connect to X server. Running in dry mode.");
@@ -384,17 +387,20 @@ int main(int argc, char** argv) {
   const int screen = DefaultScreen(display);
   const Window root = RootWindow(display, screen);
 
+  log_line("Mimic: attempting to claim root SubstructureRedirectMask.");
   XSetErrorHandler(wm_detect_error_handler);
   XSelectInput(display, root, SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask);
   XSync(display, False);
 
   if (g_bad_access) {
+    log_line("Mimic: root SubstructureRedirectMask claim failed with BadAccess.");
     log_line("Mimic: failed to become WM on root window; another window manager is already running.");
     XCloseDisplay(display);
     return 1;
   }
 
   XSetErrorHandler(x_error_handler);
+  log_line("Mimic: root SubstructureRedirectMask claim succeeded.");
   log_line("Mimic: connected to X display and claimed root window successfully.");
 
   MimicRuntime runtime(display, root, &command_registry, &workspace_model, &layout_engine, &overview);

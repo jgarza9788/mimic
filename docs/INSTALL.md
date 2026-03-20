@@ -5,6 +5,14 @@
 - C++17 compiler
 - X11 development libraries (`libX11`)
 
+## Dependency check
+
+```bash
+bash scripts/check_dependencies.sh
+```
+
+See `docs/DEPENDENCIES.md` for distro package mappings.
+
 ## Build + test
 
 ```bash
@@ -41,7 +49,7 @@ exec mimic
 
 `mimic.desktop` currently uses:
 - `Name=Mimic`
-- `Exec=mimic`
+- `Exec=<install-bindir>/mimic`
 
 ## Runtime logs
 

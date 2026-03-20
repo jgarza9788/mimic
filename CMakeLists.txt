@@ -1,11 +1,26 @@
 cmake_minimum_required(VERSION 3.16)
 project(Mimic VERSION 0.1.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(PC_X11 QUIET x11)
+  if(NOT PC_X11_FOUND)
+    message(FATAL_ERROR "Missing X11 development package (pkg-config module: x11). Install libX11 development headers (e.g. libx11-devel on Fedora, libx11 on Arch/CachyOS).")
+  endif()
+else()
+  message(WARNING "pkg-config was not found; falling back to CMake X11 detection only.")
+endif()
+
 find_package(X11 REQUIRED)
+if(NOT X11_X11_INCLUDE_PATH)
+  message(FATAL_ERROR "X11 headers were not found. Install libX11 development files.")
+endif()
 
 add_library(mimic_core
     src/MimicCommandRegistry.cpp
@@ -21,9 +36,12 @@ target_link_libraries(mimic_core PUBLIC X11::X11)
 add_executable(mimic src/main.cpp)
 target_link_libraries(mimic PRIVATE mimic_core)
 
-install(TARGETS mimic RUNTIME DESTINATION bin)
-install(FILES sessions/mimic.desktop DESTINATION share/xsessions)
-install(FILES config/mimic.keys DESTINATION share/mimic/examples)
+set(MIMIC_SESSION_EXEC "${CMAKE_INSTALL_FULL_BINDIR}/mimic")
+configure_file(sessions/mimic.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/mimic.desktop @ONLY)
+
+install(TARGETS mimic RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/mimic.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/xsessions)
+install(FILES config/mimic.keys DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/mimic/examples)
 
 include(CTest)
 if(BUILD_TESTING)
