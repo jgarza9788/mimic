@@ -10,6 +10,19 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: g++
+            build_type: Release
+            extra_cxx_flags: ""
+          - compiler: g++
+            build_type: Debug
+            extra_cxx_flags: ""
+          - compiler: clang++
+            build_type: Debug
+            extra_cxx_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
 
     steps:
       - name: Checkout
@@ -18,13 +31,18 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ libx11-dev
+          sudo apt-get install -y cmake g++ clang libx11-dev
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        env:
+          CXX: ${{ matrix.compiler }}
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DCMAKE_CXX_FLAGS="${{ matrix.extra_cxx_flags }}"
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config ${{ matrix.build_type }}
 
       - name: Run unit tests
         run: ctest --test-dir build --output-on-failure
