@@ -33,6 +33,16 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## One-command build + install
+
+Use the helper to build, test, install, create display-manager session entries (GDM + SDDM), place the executable, and provision a default system config:
+
+```bash
+sudo ./scripts/build_install.sh --prefix /usr/local --sysconfdir /etc
+```
+
+If you do not want tests in this step, add `--skip-tests`.
+
 ## Run
 
 ```bash
