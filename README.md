@@ -121,6 +121,25 @@ startx
 
 The installed desktop entry now uses an absolute `Exec=` path matching your Meson `bindir`, so `/usr/local` installs are no longer hidden by a minimal DM `PATH`.
 
+### 3) Direct invocation from an X terminal
+
+```bash
+scrollwm
+```
+
+Useful diagnostic flags (inspired by mature X11 WM workflows):
+
+```bash
+# Validate X connection/environment only (no WM ownership attempt)
+scrollwm --check
+
+# Enable synchronous X11 requests (debug aid for protocol errors)
+scrollwm --sync --verbose
+
+# Write logs to file while also printing to stderr
+scrollwm --log-file /tmp/scrollwm.log --verbose
+```
+
 ## Configuration
 
 Default config path:
@@ -144,7 +163,9 @@ If no config exists, ScrollWM starts with built-in defaults and logs a warning.
 
 - Check session logs (display manager journal, `~/.xsession-errors`, etc.).
 - Verify Xorg is available and `DISPLAY` is set in session.
-- Run `scrollwm` from an X terminal to inspect startup logs directly.
+- Run `scrollwm --check` first to verify X connectivity and then `scrollwm --verbose` for startup logs.
+- Verify desktop entry uses an absolute executable path:
+  `grep '^Exec=' /usr/share/xsessions/scrollwm.desktop`
 
 ### `could not acquire WM ownership`
 
@@ -155,6 +176,7 @@ scrollwm-session --wait-for-wm=10
 ```
 
 The session wrapper retries and prints progress while waiting.
+If retries are exhausted, ScrollWM exits non-zero and prints an actionable ownership error.
 
 ### Missing terminal on `Mod+Enter`
 
@@ -190,6 +212,9 @@ ls -l /usr/share/xsessions/scrollwm.desktop
 
 # Validate desktop entry Exec path
 grep '^Exec=' /usr/share/xsessions/scrollwm.desktop
+
+# Startup/environment probe (does not claim WM ownership)
+scrollwm --check
 
 # Ensure X11 environment exists in current shell
 printf 'DISPLAY=%s\n' "${DISPLAY:-<unset>}"
