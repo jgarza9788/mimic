@@ -25,6 +25,7 @@ namespace {
 volatile std::sig_atomic_t g_running = 1;
 bool g_bad_access = false;
 std::ofstream g_log_file;
+bool g_log_to_stderr = true;
 
 void init_log_file() {
   const char* runtime_dir = std::getenv("XDG_RUNTIME_DIR");
@@ -33,7 +34,9 @@ void init_log_file() {
 }
 
 void log_line(const std::string& line) {
-  std::cerr << line << '\n';
+  if (g_log_to_stderr) {
+    std::cerr << line << '\n';
+  }
   if (g_log_file.is_open()) {
     g_log_file << line << '\n';
     g_log_file.flush();
@@ -356,7 +359,19 @@ int main(int argc, char** argv) {
       {"/etc/xdg/mimic/mimic.keys", "/usr/local/share/mimic/examples/mimic.keys", "/usr/share/mimic/examples/mimic.keys"},
   });
 
+  std::optional<std::string> options_path;
+  const auto options = mimic::load_runtime_options(
+      mimic::toml_config_candidates(
+          xdg_config_home != nullptr ? std::optional<std::string>(xdg_config_home) : std::nullopt,
+          home != nullptr ? std::optional<std::string>(home) : std::nullopt,
+          {"/etc/xdg/mimic/mimic.toml", "/usr/local/share/mimic/examples/mimic.toml", "/usr/share/mimic/examples/mimic.toml"}),
+      &options_path);
+  g_log_to_stderr = options.log_to_stderr;
+
   log_line("Mimic: startup begin.");
+  if (options_path.has_value()) {
+    log_line("Mimic: loaded runtime options from " + *options_path + ".");
+  }
 
   const auto config_path = mimic::first_existing_path(candidates);
   if (config_path) {
@@ -405,7 +420,9 @@ int main(int argc, char** argv) {
 
   MimicRuntime runtime(display, root, &command_registry, &workspace_model, &layout_engine, &overview);
   runtime.register_key_bindings();
-  runtime.scan_existing_windows();
+  if (options.scan_existing_windows_on_startup) {
+    runtime.scan_existing_windows();
+  }
 
   log_line("Mimic: entering event loop.");
   runtime.run();

@@ -31,6 +31,9 @@ Installed artifacts:
 - `/usr/local/bin/mimic`
 - `/usr/local/share/xsessions/mimic.desktop`
 - `/usr/local/share/mimic/examples/mimic.keys`
+- `/usr/local/share/mimic/examples/mimic.toml`
+
+Install also creates `~/.config/mimic/mimic.toml` if it is missing.
 
 ## Start from xinit
 
@@ -56,6 +59,14 @@ exec mimic
 Mimic logs to stderr and also to:
 - `$XDG_RUNTIME_DIR/mimic.log` when available, else
 - `/tmp/mimic.log`
+
+You can tune runtime behavior with `~/.config/mimic/mimic.toml`:
+
+```toml
+[runtime]
+log_to_stderr = true
+scan_existing_windows_on_startup = true
+```
 
 ## Config path search order
 

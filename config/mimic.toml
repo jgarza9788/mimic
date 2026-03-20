@@ -1,0 +1,9 @@
+# Mimic runtime options
+# Copy this file to ~/.config/mimic/mimic.toml and adjust as needed.
+
+[runtime]
+# Also write logs to stderr in addition to mimic.log.
+log_to_stderr = true
+
+# Manage any already-mapped windows when Mimic starts.
+scan_existing_windows_on_startup = true
