@@ -42,6 +42,16 @@ configure_file(sessions/mimic.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/mimic.deskt
 install(TARGETS mimic RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/mimic.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/xsessions)
 install(FILES config/mimic.keys DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/mimic/examples)
+install(FILES config/mimic.toml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/mimic/examples)
+install(CODE "
+  set(_mimic_user_config_dir \"\$ENV{HOME}/.config/mimic\")
+  set(_mimic_user_toml \"\${_mimic_user_config_dir}/mimic.toml\")
+  if(NOT EXISTS \"\${_mimic_user_toml}\")
+    file(MAKE_DIRECTORY \"\${_mimic_user_config_dir}\")
+    file(INSTALL DESTINATION \"\${_mimic_user_config_dir}\" TYPE FILE FILES \"${CMAKE_CURRENT_SOURCE_DIR}/config/mimic.toml\")
+    message(STATUS \"Installed default user config: \${_mimic_user_toml}\")
+  endif()
+")
 
 include(CTest)
 if(BUILD_TESTING)
