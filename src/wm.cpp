@@ -119,14 +119,39 @@ int WM::run() {
     return 1;
   }
 
-  util::log(util::LogLevel::Info, "scrollwm started");
-  event_loop();
+  const char* display_env = std::getenv("DISPLAY");
+  util::log(util::LogLevel::Info,
+            "startup complete; entering event loop on DISPLAY=" +
+                std::string(display_env != nullptr ? display_env : "<unset>"));
+  (void)event_loop();
 
   if (key_symbols_ != nullptr) {
     xcb_key_symbols_free(key_symbols_);
   }
-  util::log(util::LogLevel::Info, "scrollwm stopped");
-  return 0;
+  if (last_exit_code_ == 0) {
+    util::log(util::LogLevel::Info, "scrollwm stopped");
+  } else {
+    util::log(util::LogLevel::Error, "scrollwm stopped due to X11 connection failure");
+  }
+  return last_exit_code_;
+}
+
+bool WM::check_startup_environment() {
+  x11::Connection probe;
+  if (!probe.valid()) {
+    const char* display_env = std::getenv("DISPLAY");
+    if (display_env == nullptr || std::string(display_env).empty()) {
+      util::log(util::LogLevel::Error,
+                "startup check failed: DISPLAY is not set; start an X server first");
+    } else {
+      util::log(util::LogLevel::Error,
+                "startup check failed: unable to connect to DISPLAY=" + std::string(display_env));
+    }
+    util::log(util::LogLevel::Error, "startup check detail: " + probe.error_message());
+    return false;
+  }
+  util::log(util::LogLevel::Info, "startup check passed: X11 connection is available");
+  return true;
 }
 
 bool WM::setup() {
@@ -162,7 +187,9 @@ bool WM::setup() {
   err = xcb_request_check(connection_.raw(), check_cookie);
   if (err != nullptr) {
     util::log(util::LogLevel::Error,
-              "could not acquire WM ownership (is another WM running?)");
+              "could not acquire WM ownership (another WM owns SubstructureRedirectMask on root)");
+    util::log(util::LogLevel::Error,
+              "action: exit existing WM or run 'scrollwm-session --wait-for-wm=10'");
     free(err);
     return false;
   }
@@ -262,16 +289,26 @@ void WM::setup_keys() {
   }
 }
 
-void WM::event_loop() {
+bool WM::event_loop() {
   while (running_) {
     xcb_generic_event_t* event = xcb_wait_for_event(connection_.raw());
     if (event == nullptr) {
+      const int conn_error = xcb_connection_has_error(connection_.raw());
+      if (conn_error != 0) {
+        util::log(util::LogLevel::Error,
+                  "event loop terminated: xcb_wait_for_event returned null with connection error code " +
+                      std::to_string(conn_error));
+        last_exit_code_ = 1;
+        return false;
+      }
       continue;
     }
     handle_event(event);
     free(event);
     xcb_flush(connection_.raw());
   }
+  last_exit_code_ = 0;
+  return true;
 }
 
 void WM::handle_event(xcb_generic_event_t* event) {

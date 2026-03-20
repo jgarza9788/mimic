@@ -20,6 +20,7 @@ namespace scrollwm {
 
 class WM {
  public:
+  static bool check_startup_environment();
   WM();
   int run();
 
@@ -67,7 +68,7 @@ class WM {
   void setup_ewmh();
   void setup_keys();
 
-  void event_loop();
+  bool event_loop();
   void handle_event(xcb_generic_event_t* event);
   void handle_map_request(const xcb_map_request_event_t& event);
   void handle_unmap_notify(const xcb_unmap_notify_event_t& event);
@@ -125,6 +126,7 @@ class WM {
   x11::Atoms atoms_;
   xcb_key_symbols_t* key_symbols_ = nullptr;
   bool running_ = true;
+  int last_exit_code_ = 0;
 
   config::Config config_;
   layout::ScrollLayout layout_engine_;

@@ -3,11 +3,30 @@
 scrollwm \- experimental scrollable tiling window manager for X11
 .SH SYNOPSIS
 .B scrollwm
+.RI [ --verbose ]
+.RI [ --log-file " PATH" ]
+.RI [ --sync ]
+.RI [ --check ]
 .SH DESCRIPTION
 .B scrollwm
 is an experimental, keyboard-first tiling window manager for X11/XLibre.
 It arranges windows in a scrollable linear layout and supports multiple workspaces,
 runtime layout direction toggling, fullscreen restore semantics, and configurable keybindings.
+.SH OPTIONS
+.TP
+.B --check
+Validate X11 connectivity and exit (does not attempt to become WM).
+.TP
+.B --verbose
+Enable debug logging.
+.TP
+.BI --log-file " PATH"
+Append logs to PATH while continuing to log to standard error.
+.TP
+.B --sync
+Enable synchronous X11 request behavior using
+.B LIBXCB_SYNCHRONIZE=1
+for diagnostics.
 .SH CONFIGURATION
 Configuration is loaded from:
 .PP

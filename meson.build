@@ -67,7 +67,9 @@ test('scrollwm-session-wrapper-test',
 scrollwm_desktop = configure_file(
   input: 'assets/xsessions/scrollwm.desktop.in',
   output: 'scrollwm.desktop',
-  configuration: {'bindir': get_option('bindir')}
+  configuration: {
+    'bindir': join_paths(get_option('prefix'), get_option('bindir'))
+  }
 )
 
 install_data(scrollwm_desktop,

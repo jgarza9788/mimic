@@ -411,6 +411,31 @@ bool test_dynamic_workspace_move_client_cleanup_simulation() {
          expect(tracked[0] == 0, "tracked index should remain valid after move cleanup");
 }
 
+bool test_dynamic_workspace_cleanup_empty_vector_bootstraps_one_workspace() {
+  std::vector<Workspace> workspaces;
+  std::vector<int> tracked = {0};
+
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+
+  return expect(workspaces.size() == 1, "cleanup should bootstrap one workspace when input is empty") &&
+         expect(workspaces[0].index() == 0, "bootstrapped workspace should use index 0") &&
+         expect(tracked[0] == 0, "tracked index should clamp to zero");
+}
+
+bool test_dynamic_workspace_cleanup_all_empty_collapses_to_one() {
+  std::vector<Workspace> workspaces;
+  workspaces.push_back(make_workspace_with_clients(0, {}));
+  workspaces.push_back(make_workspace_with_clients(1, {}));
+  workspaces.push_back(make_workspace_with_clients(2, {}));
+  std::vector<int> tracked = {2};
+
+  scrollwm::model::cleanup_empty_workspaces(workspaces, tracked);
+
+  return expect(workspaces.size() == 1, "all-empty workspace list should collapse to one workspace") &&
+         expect(workspaces[0].index() == 0, "remaining workspace should be reindexed to zero") &&
+         expect(tracked[0] == 0, "tracked index should clamp to the sole remaining workspace");
+}
+
 bool test_layout_empty_workspace_returns_no_rects() {
   Workspace ws(0);
   ScrollLayout layout(Direction::Horizontal);
@@ -674,6 +699,8 @@ int main() {
       {"workspace cleanup first/last/middle", test_dynamic_workspace_cleanup_delete_first_and_last_and_middle},
       {"workspace ensure exists contiguous", test_dynamic_workspace_ensure_exists_expands_contiguously},
       {"workspace move cleanup simulation", test_dynamic_workspace_move_client_cleanup_simulation},
+      {"workspace cleanup bootstraps empty vector", test_dynamic_workspace_cleanup_empty_vector_bootstraps_one_workspace},
+      {"workspace cleanup all empty collapses to one", test_dynamic_workspace_cleanup_all_empty_collapses_to_one},
       {"layout empty", test_layout_empty_workspace_returns_no_rects},
       {"layout single", test_layout_single_client_is_sensible},
       {"layout horizontal+vertical sanity", test_layout_horizontal_vertical_geometry_sanity},
