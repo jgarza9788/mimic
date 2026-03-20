@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Mimic
+Comment=Mimic X11 scrolling-window-manager foundation
+Exec=mimic
+Type=Application
+DesktopNames=Mimic
