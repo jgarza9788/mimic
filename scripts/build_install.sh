@@ -76,8 +76,17 @@ if [[ -x "$BIN_PATH" ]]; then
   printf '\n[3/4] Installing display-manager session files (GDM/SDDM)...\n'
   DESKTOP_FILE="$BUILD_DIR/mimic.desktop"
   if [[ ! -f "$DESKTOP_FILE" ]]; then
-    echo "Warning: expected generated desktop file not found at $DESKTOP_FILE" >&2
-    DESKTOP_FILE="sessions/mimic.desktop"
+    echo "Warning: expected generated desktop file not found at $DESKTOP_FILE; generating one with absolute Exec path." >&2
+    DESKTOP_FILE="$BUILD_DIR/mimic.desktop"
+    cat > "$DESKTOP_FILE" <<EOF
+[Desktop Entry]
+Name=Mimic
+Comment=Mimic X11 scrolling-window-manager foundation
+Exec=$BIN_PATH
+TryExec=$BIN_PATH
+Type=Application
+DesktopNames=Mimic
+EOF
   fi
 
   install -Dm644 "$DESKTOP_FILE" "$XSESSIONS_DIR_PREFIX/mimic.desktop"

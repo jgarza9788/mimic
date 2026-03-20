@@ -14,6 +14,13 @@ class MimicViewport {
   int offset_y = 0;
 };
 
+struct MimicWindowFrame {
+  int x = 0;
+  int y = 0;
+  int width = 0;
+  int height = 0;
+};
+
 class MimicLayoutEngine {
  public:
   void set_window_order(const std::vector<Window>& ordered_windows);
@@ -23,6 +30,8 @@ class MimicLayoutEngine {
   std::optional<Window> current_window() const;
   std::optional<Window> focus_next();
   std::optional<Window> focus_previous();
+
+  std::vector<MimicWindowFrame> compute_frames(int output_width, int output_height) const;
 
   const MimicViewport& viewport() const { return viewport_; }
   void scroll_by(int dx, int dy);
