@@ -55,7 +55,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 printf '\n[0/4] Configuring and building Mimic...\n'
-cmake -S . -B "$BUILD_DIR" -DCMAKE_INSTALL_PREFIX="$PREFIX"
+cmake -S . -B "$BUILD_DIR" -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_INSTALL_SYSCONFDIR="$SYSCONFDIR"
 cmake --build "$BUILD_DIR"
 
 if [[ "$RUN_TESTS" -eq 1 ]]; then
@@ -74,18 +74,20 @@ XSESSIONS_DIR_SYSTEM="/usr/share/xsessions"
 
 if [[ -x "$BIN_PATH" ]]; then
   printf '\n[3/4] Installing display-manager session files (GDM/SDDM)...\n'
-  TMP_DESKTOP="$(mktemp)"
-  sed "s#^Exec=.*#Exec=$BIN_PATH#" sessions/mimic.desktop > "$TMP_DESKTOP"
+  DESKTOP_FILE="$BUILD_DIR/mimic.desktop"
+  if [[ ! -f "$DESKTOP_FILE" ]]; then
+    echo "Warning: expected generated desktop file not found at $DESKTOP_FILE" >&2
+    DESKTOP_FILE="sessions/mimic.desktop"
+  fi
 
-  install -Dm644 "$TMP_DESKTOP" "$XSESSIONS_DIR_PREFIX/mimic.desktop"
+  install -Dm644 "$DESKTOP_FILE" "$XSESSIONS_DIR_PREFIX/mimic.desktop"
 
   if [[ -w "$XSESSIONS_DIR_SYSTEM" || ! -d "$XSESSIONS_DIR_SYSTEM" && -w /usr/share ]]; then
-    install -Dm644 "$TMP_DESKTOP" "$XSESSIONS_DIR_SYSTEM/mimic.desktop"
+    install -Dm644 "$DESKTOP_FILE" "$XSESSIONS_DIR_SYSTEM/mimic.desktop"
   else
     echo "Note: could not write $XSESSIONS_DIR_SYSTEM/mimic.desktop (need root)."
   fi
 
-  rm -f "$TMP_DESKTOP"
 else
   echo "Warning: expected binary not found at $BIN_PATH" >&2
 fi

@@ -31,6 +31,14 @@ It is still early-stage, but V001 now runs as a real WM process: it connects to 
 - Overview controller is stateful and connected, but not yet rendered visually.
 - Scrolling-strip UX remains future work.
 
+## Dependency check
+
+```bash
+bash scripts/check_dependencies.sh
+```
+
+See `docs/DEPENDENCIES.md` for package names on CachyOS/Arch and Fedora.
+
 ## Build
 
 ```bash
@@ -67,7 +75,7 @@ startx
 ## Session entry for display managers
 
 Install and then select **Mimic** from GDM/SDDM/etc. The desktop file is:
-- `sessions/mimic.desktop` (`Exec=mimic`, `Name=Mimic`)
+- `sessions/mimic.desktop.in` (configured to `Exec=<install-bindir>/mimic`, `Name=Mimic`)
 
 ## Config file search order
 
@@ -120,6 +128,7 @@ Mimic continues with defaults. Create `~/.config/mimic/mimic.keys` and add `bind
 ## Documentation
 
 - `docs/INSTALL.md`
+- `docs/DEPENDENCIES.md`
 - `docs/architecture.md`
 - `docs/roadmap.md`
 - `docs/forking-from-fluxbox.md`
