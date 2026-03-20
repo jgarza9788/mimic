@@ -20,3 +20,15 @@ MIMIC_TEST(layout_engine_remove_updates_focus) {
   MIMIC_ASSERT(engine.current_window().has_value());
   MIMIC_ASSERT(engine.current_window().value() == 21);
 }
+
+MIMIC_TEST(layout_engine_scrollable_strip_keeps_window_width_stable) {
+  mimic::MimicLayoutEngine engine;
+  engine.set_window_order({1, 2, 3, 4});
+  const auto frames = engine.compute_frames(1920, 1080);
+
+  MIMIC_ASSERT(frames.size() == 4);
+  MIMIC_ASSERT(frames[0].width == frames[1].width);
+  MIMIC_ASSERT(frames[1].width == frames[2].width);
+  MIMIC_ASSERT(frames[0].x < frames[1].x);
+  MIMIC_ASSERT(frames[1].x < frames[2].x);
+}

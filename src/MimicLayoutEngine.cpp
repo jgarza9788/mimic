@@ -59,6 +59,27 @@ std::optional<Window> MimicLayoutEngine::focus_previous() {
   return ordered_windows_[focused_index_];
 }
 
+std::vector<MimicWindowFrame> MimicLayoutEngine::compute_frames(int output_width, int output_height) const {
+  std::vector<MimicWindowFrame> frames;
+  if (ordered_windows_.empty() || output_width <= 0 || output_height <= 0) {
+    return frames;
+  }
+
+  const int gap = 16;
+  const int preferred_width = (output_width * 3) / 5;
+  const int minimum_width = std::min(output_width, 640);
+  const int window_width = std::max(1, std::min(output_width, std::max(minimum_width, preferred_width)));
+
+  frames.reserve(ordered_windows_.size());
+  for (std::size_t i = 0; i < ordered_windows_.size(); ++i) {
+    const int index = static_cast<int>(i);
+    const int x = index * (window_width + gap) + viewport_.offset_x;
+    frames.push_back({x, viewport_.offset_y, window_width, output_height});
+  }
+
+  return frames;
+}
+
 void MimicLayoutEngine::scroll_by(int dx, int dy) {
   viewport_.offset_x += dx;
   viewport_.offset_y += dy;

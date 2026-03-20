@@ -2,5 +2,6 @@
 Name=Mimic
 Comment=Mimic X11 scrolling-window-manager foundation
 Exec=mimic
+TryExec=mimic
 Type=Application
 DesktopNames=Mimic

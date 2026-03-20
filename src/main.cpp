@@ -303,13 +303,10 @@ class MimicRuntime {
       return;
     }
 
-    const int count = static_cast<int>(ordered.size());
-    for (int i = 0; i < count; ++i) {
-      const int width = root_attrs.width / std::max(1, count);
-      const int x = i * width + layout_engine_->viewport().offset_x;
-      const int y = layout_engine_->viewport().offset_y;
-      const int final_width = i == count - 1 ? root_attrs.width - (width * i) : width;
-      XMoveResizeWindow(display_, ordered[static_cast<std::size_t>(i)], x, y, final_width, root_attrs.height);
+    const auto frames = layout_engine_->compute_frames(root_attrs.width, root_attrs.height);
+    for (std::size_t i = 0; i < frames.size(); ++i) {
+      const auto& frame = frames[i];
+      XMoveResizeWindow(display_, ordered[i], frame.x, frame.y, frame.width, frame.height);
     }
 
     if (overview_->state() == mimic::MimicOverviewController::State::kActive) {
