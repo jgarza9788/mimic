@@ -45,7 +45,24 @@ install(FILES config/mimic.keys DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/mimic/e
 install(FILES config/config.toml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/mimic/examples)
 install(FILES config/mimic.toml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/mimic/examples)
 install(CODE "
-  set(_mimic_user_config_dir \"\$ENV{HOME}/.config/mimic\")
+  set(_mimic_user_home \"\$ENV{HOME}\")
+  if(DEFINED ENV{SUDO_USER} AND NOT \"\$ENV{SUDO_USER}\" STREQUAL \"\")
+    execute_process(
+      COMMAND getent passwd \"\$ENV{SUDO_USER}\"
+      OUTPUT_VARIABLE _mimic_passwd_entry
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET
+    )
+    if(_mimic_passwd_entry)
+      string(REPLACE \":\" \";\" _mimic_passwd_fields \"\${_mimic_passwd_entry}\")
+      list(LENGTH _mimic_passwd_fields _mimic_passwd_len)
+      if(_mimic_passwd_len GREATER 5)
+        list(GET _mimic_passwd_fields 5 _mimic_user_home)
+      endif()
+    endif()
+  endif()
+
+  set(_mimic_user_config_dir \"\${_mimic_user_home}/.config/mimic\")
   set(_mimic_user_toml \"\${_mimic_user_config_dir}/config.toml\")
   if(NOT EXISTS \"\${_mimic_user_toml}\")
     file(MAKE_DIRECTORY \"\${_mimic_user_config_dir}\")

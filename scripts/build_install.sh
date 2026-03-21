@@ -68,6 +68,23 @@ fi
 printf '\n[2/4] Installing binaries, session file, and example config...\n'
 cmake --install "$BUILD_DIR"
 
+TARGET_HOME="${HOME}"
+if [[ -n "${SUDO_USER:-}" ]] && command -v getent >/dev/null 2>&1; then
+  SUDO_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6 || true)"
+  if [[ -n "$SUDO_HOME" ]]; then
+    TARGET_HOME="$SUDO_HOME"
+  fi
+fi
+
+USER_CONFIG_DIR="$TARGET_HOME/.config/mimic"
+USER_CONFIG_FILE="$USER_CONFIG_DIR/config.toml"
+if [[ ! -f "$USER_CONFIG_FILE" ]]; then
+  install -Dm644 config/config.toml "$USER_CONFIG_FILE"
+  echo "Installed default user config: $USER_CONFIG_FILE"
+else
+  echo "Kept existing user config: $USER_CONFIG_FILE"
+fi
+
 BIN_PATH="$PREFIX/bin/mimic"
 XSESSIONS_DIR_PREFIX="$PREFIX/share/xsessions"
 XSESSIONS_DIR_SYSTEM="/usr/share/xsessions"
@@ -120,4 +137,5 @@ echo
 echo "Mimic install is ready."
 echo "- Binary: $BIN_PATH"
 echo "- Session files: $XSESSIONS_DIR_PREFIX/mimic.desktop and (if permitted) $XSESSIONS_DIR_SYSTEM/mimic.desktop"
+echo "- User runtime options: $USER_CONFIG_FILE"
 echo "- Default config: $DEFAULT_CONFIG_FILE"
