@@ -1,6 +1,5 @@
 # Mimic runtime options
-# Legacy filename: Mimic also supports ~/.config/mimic/mimic.toml.
-# Preferred filename is ~/.config/mimic/config.toml.
+# Copy this file to ~/.config/mimic/config.toml and adjust as needed.
 
 [runtime]
 # Also write logs to stderr in addition to mimic.log.

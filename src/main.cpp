@@ -361,7 +361,12 @@ int main(int argc, char** argv) {
       mimic::toml_config_candidates(
           xdg_config_home != nullptr ? std::optional<std::string>(xdg_config_home) : std::nullopt,
           home != nullptr ? std::optional<std::string>(home) : std::nullopt,
-          {"/etc/xdg/mimic/mimic.toml", "/usr/local/share/mimic/examples/mimic.toml", "/usr/share/mimic/examples/mimic.toml"}),
+          {"/etc/xdg/mimic/config.toml",
+           "/etc/xdg/mimic/mimic.toml",
+           "/usr/local/share/mimic/examples/config.toml",
+           "/usr/local/share/mimic/examples/mimic.toml",
+           "/usr/share/mimic/examples/config.toml",
+           "/usr/share/mimic/examples/mimic.toml"}),
       &options_path);
   g_log_to_stderr = options.log_to_stderr;
 
