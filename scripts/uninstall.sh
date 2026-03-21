@@ -12,5 +12,5 @@ else
 fi
 
 target_home="$(eval echo "~${target_user}")"
-rm -f "${target_home}/.config/mimic/conf.toml"
+rm -f "${target_home}/.config/mimic/config.toml"
 rmdir --ignore-fail-on-non-empty "${target_home}/.config/mimic" 2>/dev/null || true

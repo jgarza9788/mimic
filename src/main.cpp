@@ -38,7 +38,7 @@ int main() {
 
     mimic::ConfigLoader config_loader;
     auto config = config_loader.load_layered("/usr/share/mimic/config/default.toml",
-                                             std::filesystem::path(getenv("HOME")) / ".config/mimic/conf.toml");
+                                             std::filesystem::path(getenv("HOME")) / ".config/mimic/config.toml");
 
     mimic::Logger logger(mimic::LogLevel::Info);
     mimic::XcbBackend backend;
@@ -56,9 +56,9 @@ int main() {
     mimic::IpcServer ipc(config.ipc_socket_path);
     ipc.start([&wm](const std::string& command) { return wm.dispatch_command(command); });
 
-    mimic::ConfigWatcher watcher(std::filesystem::path(getenv("HOME")) / ".config/mimic/conf.toml", [&]() {
+    mimic::ConfigWatcher watcher(std::filesystem::path(getenv("HOME")) / ".config/mimic/config.toml", [&]() {
         config = config_loader.load_layered("/usr/share/mimic/config/default.toml",
-                                            std::filesystem::path(getenv("HOME")) / ".config/mimic/conf.toml");
+                                            std::filesystem::path(getenv("HOME")) / ".config/mimic/config.toml");
         logger.log(mimic::LogLevel::Info, "Config reloaded");
     });
 
