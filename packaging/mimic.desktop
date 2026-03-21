@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Mimic
+Comment=Mimic X11 window manager
+Exec=/usr/local/bin/mimic
+TryExec=/usr/local/bin/mimic
+Type=Application
+DesktopNames=Mimic
+X-LightDM-DesktopName=Mimic
