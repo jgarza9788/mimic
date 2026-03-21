@@ -31,7 +31,8 @@ bool WindowManager::initialize() {
 
     backend_.grab_default_keys();
     for (const auto window : backend_.query_windows()) {
-        ManagedWindow managed {.id = window};
+        ManagedWindow managed {};
+        managed.id = window;
         if (!rules_engine_.should_float(managed)) {
             workspace_manager_.active(0).layout().insert_after_focus(window);
         }
@@ -101,7 +102,8 @@ std::string WindowManager::dispatch_command(const std::string& command) {
 }
 
 void WindowManager::on_map_request(xcb_map_request_event_t* event) {
-    ManagedWindow managed {.id = event->window};
+    ManagedWindow managed {};
+    managed.id = event->window;
     managed_[event->window] = managed;
 
     if (!rules_engine_.should_float(managed)) {
