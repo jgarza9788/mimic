@@ -41,10 +41,12 @@ MIMIC_TEST(toml_config_candidates_respect_priority_order) {
       std::optional<std::string>("/tmp/home"),
       {"/tmp/fallback.toml"});
 
-  MIMIC_ASSERT(candidates.size() == 3);
-  MIMIC_ASSERT(candidates[0] == "/tmp/xdg/mimic/mimic.toml");
-  MIMIC_ASSERT(candidates[1] == "/tmp/home/.config/mimic/mimic.toml");
-  MIMIC_ASSERT(candidates[2] == "/tmp/fallback.toml");
+  MIMIC_ASSERT(candidates.size() == 5);
+  MIMIC_ASSERT(candidates[0] == "/tmp/xdg/mimic/config.toml");
+  MIMIC_ASSERT(candidates[1] == "/tmp/xdg/mimic/mimic.toml");
+  MIMIC_ASSERT(candidates[2] == "/tmp/home/.config/mimic/config.toml");
+  MIMIC_ASSERT(candidates[3] == "/tmp/home/.config/mimic/mimic.toml");
+  MIMIC_ASSERT(candidates[4] == "/tmp/fallback.toml");
 }
 
 MIMIC_TEST(runtime_options_are_loaded_from_toml) {

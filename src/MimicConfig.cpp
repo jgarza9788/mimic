@@ -68,10 +68,12 @@ std::vector<std::string> toml_config_candidates(std::optional<std::string> xdg_c
   std::vector<std::string> paths;
 
   if (xdg_config_home && !xdg_config_home->empty()) {
+    paths.push_back(*xdg_config_home + "/mimic/config.toml");
     paths.push_back(*xdg_config_home + "/mimic/mimic.toml");
   }
 
   if (home && !home->empty()) {
+    paths.push_back(*home + "/.config/mimic/config.toml");
     paths.push_back(*home + "/.config/mimic/mimic.toml");
   }
 

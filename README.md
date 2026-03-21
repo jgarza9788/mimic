@@ -57,9 +57,10 @@ Installed artifacts:
 - `/usr/local/bin/mimic`
 - `/usr/local/share/xsessions/mimic.desktop`
 - `/usr/local/share/mimic/examples/mimic.keys`
+- `/usr/local/share/mimic/examples/config.toml`
 - `/usr/local/share/mimic/examples/mimic.toml`
 
-Install also creates a default runtime options file at `~/.config/mimic/mimic.toml` if it does not already exist.
+Install also creates a default runtime options file at `~/.config/mimic/config.toml` if it does not already exist.
 
 ## Run from TTY (`xinit`)
 
@@ -99,7 +100,7 @@ bind Mod4+d exec dmenu_run
 
 ## Logging and diagnostics
 
-Runtime options in `mimic.toml`:
+Runtime options in `config.toml`:
 
 ```toml
 [runtime]
