@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 
     mimic::ConfigLoader loader;
     auto config = loader.load_layered("/usr/share/mimic/config/default.toml",
-                                      std::filesystem::path(getenv("HOME")) / ".config/mimic/conf.toml");
+                                      std::filesystem::path(getenv("HOME")) / ".config/mimic/config.toml");
 
     std::string command;
     for (int i = 1; i < argc; ++i) {

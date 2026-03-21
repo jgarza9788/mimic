@@ -1,4 +1,4 @@
-# Example user config for ~/.config/mimic/conf.toml
+# Example user config for ~/.config/mimic/config.toml
 gaps = 12
 focus_follows_mouse = false
 bar_wheel_scroll = true

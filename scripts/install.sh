@@ -13,7 +13,7 @@ fi
 
 target_home="$(eval echo "~${target_user}")"
 target_config_dir="${target_home}/.config/mimic"
-target_config_path="${target_config_dir}/conf.toml"
+target_config_path="${target_config_dir}/config.toml"
 
 mkdir -p "${target_config_dir}"
 if [[ ! -f "${target_config_path}" ]]; then

@@ -76,7 +76,7 @@ sudo cmake --install build
 ## Config locations
 
 - System defaults: `/usr/share/mimic/config/default.toml`
-- User overrides: `~/.config/mimic/conf.toml`
+- User overrides: `~/.config/mimic/config.toml`
 
 Precedence: user config overrides system defaults.
 
