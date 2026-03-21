@@ -7,3 +7,37 @@ log_to_stderr = true
 
 # Manage any already-mapped windows when Mimic starts.
 scan_existing_windows_on_startup = true
+
+[layout]
+# Horizontal gap between windows in the strip layout.
+gap_px = 16
+
+# Padding from the screen edge.
+edge_padding_px = 0
+
+# Minimum width for any tiled client.
+minimum_window_width_px = 640
+
+# Width of each window as a fraction of output width.
+primary_window_width_ratio = 0.6
+
+[input]
+# Planned behavior toggles for upcoming pointer-driven workflows.
+focus_follows_mouse = false
+warp_cursor_on_focus = false
+key_repeat_rate_hz = 30
+key_repeat_delay_ms = 300
+
+[overview]
+# Reserved knobs for overview UX as it matures.
+enabled = true
+dim_background = true
+columns = 3
+outer_gap_px = 24
+animation_duration_ms = 180
+
+[startup]
+# Startup/session tuning hooks.
+default_workspace = 1
+spawn_status_notifier = false
+startup_shell_command = ""

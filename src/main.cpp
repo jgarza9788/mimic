@@ -369,6 +369,10 @@ int main(int argc, char** argv) {
            "/usr/share/mimic/examples/mimic.toml"}),
       &options_path);
   g_log_to_stderr = options.log_to_stderr;
+  layout_engine.set_layout_options({options.layout.gap_px,
+                                    options.layout.edge_padding_px,
+                                    options.layout.minimum_window_width_px,
+                                    options.layout.primary_window_width_ratio});
 
   log_line("Mimic: startup begin.");
   if (options_path.has_value()) {
