@@ -24,6 +24,7 @@ bool WindowManager::initialize() {
         logger_.log(LogLevel::Error, "Failed to connect to X server");
         return false;
     }
+    compositor_.attach_x11_context(backend_.connection(), backend_.root_window());
 
     monitor_manager_.set_monitors({MonitorInfo {.id = 0, .x = 0, .y = 0, .width = 1920, .height = 1080}});
     workspace_manager_.ensure_monitor(monitor_manager_.primary_monitor_id());
