@@ -1,0 +1,24 @@
+# mimic default configuration
+
+# layout and visuals
+gaps = 8
+border_width = 2
+dim_inactive = true
+focus_follows_mouse = false
+bar_wheel_scroll = true
+ipc_socket_path = "/tmp/mimic.sock"
+
+[keybindings.focus_left]
+modifiers = "Super"
+key = "h"
+command = "focus left"
+
+[keybindings.focus_right]
+modifiers = "Super"
+key = "l"
+command = "focus right"
+
+[keybindings.overview]
+modifiers = "Super"
+key = "o"
+command = "toggle overview"

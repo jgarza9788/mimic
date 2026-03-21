@@ -1,0 +1,14 @@
+# Example user config for ~/.config/mimic/conf.toml
+gaps = 12
+focus_follows_mouse = false
+bar_wheel_scroll = true
+
+[keybindings.focus_left]
+modifiers = "Super"
+key = "Left"
+command = "focus left"
+
+[keybindings.focus_right]
+modifiers = "Super"
+key = "Right"
+command = "focus right"
