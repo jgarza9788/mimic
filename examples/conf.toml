@@ -5,10 +5,45 @@ bar_wheel_scroll = true
 
 [keybindings.focus_left]
 modifiers = "Super"
-key = "Left"
+key = "H"
 command = "focus left"
 
 [keybindings.focus_right]
 modifiers = "Super"
-key = "Right"
+key = "L"
 command = "focus right"
+
+[keybindings.open_terminal]
+modifiers = "Super"
+key = "T"
+command = "spawn terminal"
+
+[keybindings.quit_focused_all]
+modifiers = "Super"
+key = "Q"
+command = "quit focused all"
+
+[keybindings.move_focused_left]
+modifiers = "Super"
+key = "Left"
+command = "move left"
+
+[keybindings.move_focused_right]
+modifiers = "Super"
+key = "Right"
+command = "move right"
+
+[keybindings.focus_next]
+modifiers = "Super"
+key = "J"
+command = "focus right"
+
+[keybindings.focus_prev]
+modifiers = "Super"
+key = "K"
+command = "focus left"
+
+[keybindings.toggle_overview]
+modifiers = "Super"
+key = "O"
+command = "toggle overview"
