@@ -44,6 +44,10 @@ xcb_window_t XcbBackend::root_window() const {
     return screen_ ? screen_->root : XCB_NONE;
 }
 
+xcb_connection_t* XcbBackend::connection() const {
+    return connection_;
+}
+
 void XcbBackend::grab_default_keys() {
     if (!connection_ || !screen_) {
         return;

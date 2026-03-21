@@ -39,6 +39,11 @@ public:
     [[nodiscard]] xcb_window_t root_window() const;
 
     /**
+     * @brief Gets raw XCB connection for integration helpers.
+     */
+    [[nodiscard]] xcb_connection_t* connection() const;
+
+    /**
      * @brief Grabs common keybindings used by first working slice.
      */
     void grab_default_keys();
