@@ -44,6 +44,7 @@ target_link_libraries(mimic-msg PRIVATE mimic_core)
 install(TARGETS mimic mimic-msg RUNTIME DESTINATION bin)
 install(DIRECTORY config/ DESTINATION share/mimic/config)
 install(FILES README.md LICENSE DESTINATION share/doc/mimic)
+install(FILES packaging/mimic.desktop DESTINATION share/xsessions)
 
 if(MIMIC_BUILD_TESTS)
     enable_testing()

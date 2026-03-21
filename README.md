@@ -67,6 +67,12 @@ cmake --build build -j"$(nproc)"
 sudo cmake --install build
 ```
 
+The installer also places a desktop session entry at:
+
+- `/usr/share/xsessions/mimic.desktop`
+
+That allows both **SDDM** and **GDM** to list **Mimic** as an X11 session option on the login screen.
+
 ## Uninstall instructions
 
 ```bash

@@ -4,6 +4,7 @@ set -euo pipefail
 sudo rm -f /usr/local/bin/mimic /usr/local/bin/mimic-msg
 sudo rm -rf /usr/local/share/mimic
 sudo rm -rf /usr/local/share/doc/mimic
+sudo rm -f /usr/share/xsessions/mimic.desktop /usr/local/share/xsessions/mimic.desktop
 
 if [[ -n "${SUDO_USER:-}" ]]; then
     target_user="${SUDO_USER}"
