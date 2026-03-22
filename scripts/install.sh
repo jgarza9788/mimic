@@ -4,6 +4,7 @@ set -euo pipefail
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j"$(nproc)"
 sudo cmake --install build
+sudo install -Dm644 build/mimic.desktop /usr/share/xsessions/mimic.desktop
 
 if [[ -n "${SUDO_USER:-}" ]]; then
     target_user="${SUDO_USER}"

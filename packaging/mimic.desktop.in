@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Mimic
+Comment=Mimic X11 window manager
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/mimic
+TryExec=@CMAKE_INSTALL_FULL_BINDIR@/mimic
+Type=Application
+DesktopNames=Mimic

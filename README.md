@@ -67,6 +67,13 @@ cmake --build build -j"$(nproc)"
 sudo cmake --install build
 ```
 
+The installer also places a desktop session entry at:
+
+- `/usr/share/xsessions/mimic.desktop`
+
+`cmake --install` also installs a session file under the active install prefix (for example `/usr/local/share/xsessions/mimic.desktop`).
+This allows both **SDDM** and **GDM** to list **Mimic** as an X11 session option on the login screen.
+
 ## Uninstall instructions
 
 ```bash
@@ -75,7 +82,7 @@ sudo cmake --install build
 
 ## Config locations
 
-- System defaults: `/usr/share/mimic/config/default.toml`
+- System defaults: `<install-prefix>/share/mimic/config/default.toml` (for `./scripts/install.sh`, this is typically `/usr/local/share/mimic/config/default.toml`)
 - User overrides: `~/.config/mimic/config.toml`
 
 Precedence: user config overrides system defaults.

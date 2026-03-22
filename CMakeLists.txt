@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(mimic VERSION 0.1.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -34,6 +36,10 @@ target_include_directories(mimic_core
 
 target_compile_options(mimic_core PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(mimic_core PUBLIC ${XCB_LIBRARIES})
+target_compile_definitions(mimic_core
+    PUBLIC
+        MIMIC_SYSTEM_CONFIG_PATH="${CMAKE_INSTALL_FULL_DATAROOTDIR}/mimic/config/default.toml"
+)
 
 add_executable(mimic src/main.cpp)
 target_link_libraries(mimic PRIVATE mimic_core)
@@ -44,6 +50,8 @@ target_link_libraries(mimic-msg PRIVATE mimic_core)
 install(TARGETS mimic mimic-msg RUNTIME DESTINATION bin)
 install(DIRECTORY config/ DESTINATION share/mimic/config)
 install(FILES README.md LICENSE DESTINATION share/doc/mimic)
+configure_file(packaging/mimic.desktop.in mimic.desktop @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/mimic.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/xsessions)
 
 if(MIMIC_BUILD_TESTS)
     enable_testing()
