@@ -1,10 +1,9 @@
 #ifndef MIMIC_WM_H
 #define MIMIC_WM_H
 
-#include <X11/Xatom.h>
-#include <X11/Xlib.h>
 #include <stdbool.h>
 #include <time.h>
+#include <xcb/xcb.h>
 
 #include "config.h"
 
@@ -18,7 +17,7 @@ typedef struct {
 } RuntimeConfig;
 
 struct Client {
-    Window win;
+    xcb_window_t win;
     int x;
     int y;
     int w;
@@ -44,24 +43,24 @@ struct WorkspaceState {
 };
 
 typedef struct {
-    Display *dpy;
-    int screen;
-    Window root;
+    xcb_connection_t *dpy;
+    xcb_screen_t *screen;
+    xcb_window_t root;
     unsigned int sw;
     unsigned int sh;
-    unsigned long border_focus;
-    unsigned long border_normal;
+    uint32_t border_focus;
+    uint32_t border_normal;
 
-    Atom wm_delete;
-    Atom wm_protocols;
-    Atom net_active_window;
-    Atom net_wm_state;
-    Atom net_wm_state_fullscreen;
-    Atom net_supported;
-    Atom net_wm_desktop;
-    Atom net_current_desktop;
-    Atom net_wm_window_type;
-    Atom net_wm_window_type_dock;
+    xcb_atom_t wm_delete;
+    xcb_atom_t wm_protocols;
+    xcb_atom_t net_active_window;
+    xcb_atom_t net_wm_state;
+    xcb_atom_t net_wm_state_fullscreen;
+    xcb_atom_t net_supported;
+    xcb_atom_t net_wm_desktop;
+    xcb_atom_t net_current_desktop;
+    xcb_atom_t net_wm_window_type;
+    xcb_atom_t net_wm_window_type_dock;
 
     Client *clients;
     Client *focused;
