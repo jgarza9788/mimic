@@ -1,0 +1,30 @@
+# MimicWM runtime defaults
+# Copy to ~/.config/mimicwm/config.toml to override per user.
+
+[commands]
+terminal = "xterm"
+menu = "dmenu_run"
+
+[picom]
+# Auto mode prefers a GPU backend (GLX) and falls back to xrender.
+backend = "auto"
+config = "~/.config/mimicwm/picom.conf"
+
+[hotkeys]
+"Super+Enter" = "Launch terminal"
+"Super+R" = "Launch app menu"
+"Super+Q" = "Close focused window"
+"Super+Left" = "Focus previous window"
+"Super+Right" = "Focus next window"
+"Super+Up" = "Move focused window up"
+"Super+Down" = "Move focused window down"
+"Super+Shift+Left" = "Resize focused window narrower"
+"Super+Shift+Right" = "Resize focused window wider"
+"Super+Shift+Up" = "Resize focused window shorter"
+"Super+Shift+Down" = "Resize focused window taller"
+"Super+1..4" = "Switch workspace"
+"Super+Shift+1..4" = "Move focused window to workspace"
+"Super+F" = "Toggle fullscreen"
+"Super+M" = "Minimize focused window"
+"Super+Shift+M" = "Restore last minimized window in current workspace"
+"Super+Space" = "Toggle tiling mode"

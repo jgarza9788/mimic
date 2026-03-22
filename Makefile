@@ -39,6 +39,7 @@ install: $(TARGET)
 	install -m 644 assets/mimicwm.desktop $(DESTDIR)$(DATADIR)/xsessions/mimicwm.desktop
 	install -d $(DESTDIR)$(DATADIR)/mimicwm
 	install -m 644 config/picom.conf $(DESTDIR)$(DATADIR)/mimicwm/picom.conf
+	install -m 644 config/config.toml $(DESTDIR)$(DATADIR)/mimicwm/config.toml
 	install -m 755 scripts/start-mimicwm-session.sh $(DESTDIR)$(DATADIR)/mimicwm/start-mimicwm-session.sh
 
 uninstall:

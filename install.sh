@@ -22,6 +22,7 @@ install -m 755 scripts/start-mimicwm-session.sh "$SHAREDIR/$WM_NAME/start-mimicw
 install -m 644 assets/mimicwm.desktop "$SHAREDIR/xsessions/mimicwm.desktop"
 install -m 644 config/picom.conf "$SHAREDIR/$WM_NAME/picom.conf"
 install -m 644 config/default.conf "$SHAREDIR/$WM_NAME/default.conf"
+install -m 644 config/config.toml "$SHAREDIR/$WM_NAME/config.toml"
 
 echo "[mimicwm] Installing default user config skeleton (if missing)..."
 for home in /home/*; do
@@ -34,6 +35,10 @@ for home in /home/*; do
   if [ ! -e "$user_cfg_dir/config" ]; then
     install -d -m 755 "$user_cfg_dir"
     install -m 644 config/default.conf "$user_cfg_dir/config"
+  fi
+  if [ ! -e "$user_cfg_dir/config.toml" ]; then
+    install -d -m 755 "$user_cfg_dir"
+    install -m 644 config/config.toml "$user_cfg_dir/config.toml"
   fi
 done
 
