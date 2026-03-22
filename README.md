@@ -39,7 +39,7 @@ This is a minimal but usable first version with:
 
 - `src/` – C source files
 - `include/` – headers and default constants
-- `config/` – default configs (`picom.conf`, launcher config)
+- `config/` – default configs (`picom.conf`, `config.toml`)
 - `scripts/` – session startup helpers
 - `assets/` – desktop session entry
 - `Makefile` – build/install rules
@@ -185,6 +185,7 @@ DISPLAY=:2 xterm
 - Session script runtime config:
   - `~/.config/mimicwm/config.toml` (commands + hotkeys + picom backend)
   - `~/.config/mimicwm/picom.conf`
+  - `~/.config/mimicwm/config.TOML` is accepted as a compatibility fallback, but `config.toml` is the canonical filename.
 
 ## How picom is used
 
@@ -204,6 +205,7 @@ MimicWM does not implement compositing internally.
   - another WM is already running on that display.
 - **No terminal on `Super+Enter`**:
   - set `commands.terminal` in `~/.config/mimicwm/config.toml`.
+  - changes to `config.toml` are picked up on the next `Super` keybinding press.
   - MimicWM also tries common terminal fallbacks (`xterm`, `alacritty`, `kitty`, etc.).
 - **No transparency/shadows**:
   - ensure picom is installed and running.
