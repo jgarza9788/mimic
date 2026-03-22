@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -53,6 +54,157 @@ static bool has_path_separator(const char *cmd) {
 static void trim_leading_spaces(const char **p) {
     while (**p && isspace((unsigned char)**p)) {
         (*p)++;
+    }
+}
+
+static void trim_trailing_whitespace(char *s) {
+    size_t len = strlen(s);
+    while (len > 0 && isspace((unsigned char)s[len - 1])) {
+        s[--len] = '\0';
+    }
+}
+
+static void copy_config_value(char *dest, size_t dest_size, const char *src) {
+    if (!dest || dest_size == 0) {
+        return;
+    }
+    dest[0] = '\0';
+    if (!src) {
+        return;
+    }
+
+    const char *start = src;
+    trim_leading_spaces(&start);
+    size_t len = strlen(start);
+    while (len > 0 && isspace((unsigned char)start[len - 1])) {
+        len--;
+    }
+
+    if (len >= 2 && start[0] == '"' && start[len - 1] == '"') {
+        start++;
+        len -= 2;
+    }
+    if (len >= dest_size) {
+        len = dest_size - 1;
+    }
+
+    memcpy(dest, start, len);
+    dest[len] = '\0';
+}
+
+static bool first_existing_path(char *dest, size_t dest_size, const char *const *candidates) {
+    struct stat st = {0};
+    for (size_t i = 0; candidates[i]; i++) {
+        if (stat(candidates[i], &st) == 0 && S_ISREG(st.st_mode)) {
+            snprintf(dest, dest_size, "%s", candidates[i]);
+            return true;
+        }
+    }
+    return false;
+}
+
+static void resolve_runtime_config_path(char *out, size_t out_size) {
+    out[0] = '\0';
+    const char *home = getenv("HOME");
+    if (home && *home) {
+        char user_toml[1024] = {0};
+        char user_toml_upper[1024] = {0};
+        snprintf(user_toml, sizeof(user_toml), "%s/.config/mimicwm/config.toml", home);
+        snprintf(user_toml_upper, sizeof(user_toml_upper), "%s/.config/mimicwm/config.TOML", home);
+
+        const char *user_candidates[] = {user_toml, user_toml_upper, NULL};
+        if (first_existing_path(out, out_size, user_candidates)) {
+            return;
+        }
+    }
+
+    const char *system_candidates[] = {"/usr/local/share/mimicwm/config.toml", NULL};
+    (void)first_existing_path(out, out_size, system_candidates);
+}
+
+static void load_runtime_config(void) {
+    wm.runtime_terminal[0] = '\0';
+    wm.runtime_menu[0] = '\0';
+
+    char path[sizeof(wm.runtime_toml_path)] = {0};
+    resolve_runtime_config_path(path, sizeof(path));
+    if (!path[0]) {
+        wm.runtime_toml_path[0] = '\0';
+        wm.runtime_toml_mtime = 0;
+        return;
+    }
+
+    struct stat st = {0};
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        wm.runtime_toml_path[0] = '\0';
+        wm.runtime_toml_mtime = 0;
+        return;
+    }
+
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        fprintf(stderr, "mimicwm: unable to read config %s: %s\n", path, strerror(errno));
+        return;
+    }
+
+    bool in_commands = false;
+    char line[2048] = {0};
+    while (fgets(line, sizeof(line), fp)) {
+        trim_trailing_whitespace(line);
+        const char *p = line;
+        trim_leading_spaces(&p);
+        if (!*p || *p == '#') {
+            continue;
+        }
+
+        if (*p == '[') {
+            in_commands = strncmp(p, "[commands]", 10) == 0;
+            continue;
+        }
+        if (!in_commands) {
+            continue;
+        }
+
+        if (strncmp(p, "terminal", 8) == 0) {
+            const char *eq = strchr(p, '=');
+            if (eq) {
+                copy_config_value(wm.runtime_terminal, sizeof(wm.runtime_terminal), eq + 1);
+            }
+        } else if (strncmp(p, "menu", 4) == 0) {
+            const char *eq = strchr(p, '=');
+            if (eq) {
+                copy_config_value(wm.runtime_menu, sizeof(wm.runtime_menu), eq + 1);
+            }
+        }
+    }
+
+    fclose(fp);
+    snprintf(wm.runtime_toml_path, sizeof(wm.runtime_toml_path), "%s", path);
+    wm.runtime_toml_mtime = st.st_mtime;
+}
+
+static void reload_runtime_config_if_changed(void) {
+    char path[sizeof(wm.runtime_toml_path)] = {0};
+    resolve_runtime_config_path(path, sizeof(path));
+
+    if (!path[0]) {
+        if (wm.runtime_toml_path[0]) {
+            load_runtime_config();
+        }
+        return;
+    }
+
+    struct stat st = {0};
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        if (wm.runtime_toml_path[0]) {
+            load_runtime_config();
+        }
+        return;
+    }
+
+    if (strncmp(path, wm.runtime_toml_path, sizeof(wm.runtime_toml_path)) != 0 ||
+        st.st_mtime != wm.runtime_toml_mtime) {
+        load_runtime_config();
     }
 }
 
@@ -162,7 +314,7 @@ static void spawn_terminal(void) {
     };
     const char *preferred = getenv("MIMICWM_TERMINAL");
     if (!preferred || !*preferred) {
-        preferred = TERMINAL_CMD;
+        preferred = wm.runtime_terminal[0] ? wm.runtime_terminal : TERMINAL_CMD;
     }
     spawn_first_available(preferred, fallbacks);
 }
@@ -176,7 +328,7 @@ static void spawn_menu(void) {
     };
     const char *preferred = getenv("MIMICWM_MENU");
     if (!preferred || !*preferred) {
-        preferred = MENU_CMD;
+        preferred = wm.runtime_menu[0] ? wm.runtime_menu : MENU_CMD;
     }
     spawn_first_available(preferred, fallbacks);
 }
@@ -656,6 +808,7 @@ static void keypress(XKeyEvent *e) {
     if (!(e->state & MOD_MASK)) {
         return;
     }
+    reload_runtime_config_if_changed();
 
     KeySym sym = XLookupKeysym(e, 0);
     bool shift = e->state & ShiftMask;
@@ -941,6 +1094,7 @@ void wm_init(void) {
                      StructureNotifyMask | PropertyChangeMask | KeyPressMask);
 
     setup_atoms();
+    load_runtime_config();
     grab_keys();
     grab_buttons();
     scan_existing_windows();

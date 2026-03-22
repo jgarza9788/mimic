@@ -3,11 +3,14 @@ set -eu
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/mimicwm"
 USER_TOML="$CONFIG_DIR/config.toml"
+USER_TOML_UPPER="$CONFIG_DIR/config.TOML"
 SYSTEM_TOML="/usr/local/share/mimicwm/config.toml"
 
 pick_toml() {
     if [ -f "$USER_TOML" ]; then
         printf '%s\n' "$USER_TOML"
+    elif [ -f "$USER_TOML_UPPER" ]; then
+        printf '%s\n' "$USER_TOML_UPPER"
     elif [ -f "$SYSTEM_TOML" ]; then
         printf '%s\n' "$SYSTEM_TOML"
     else

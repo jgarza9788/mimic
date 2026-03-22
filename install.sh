@@ -21,7 +21,6 @@ install -m 755 "$WM_NAME" "$BINDIR/$WM_NAME"
 install -m 755 scripts/start-mimicwm-session.sh "$SHAREDIR/$WM_NAME/start-mimicwm-session.sh"
 install -m 644 assets/mimicwm.desktop "$SHAREDIR/xsessions/mimicwm.desktop"
 install -m 644 config/picom.conf "$SHAREDIR/$WM_NAME/picom.conf"
-install -m 644 config/default.conf "$SHAREDIR/$WM_NAME/default.conf"
 install -m 644 config/config.toml "$SHAREDIR/$WM_NAME/config.toml"
 
 echo "[mimicwm] Installing default user config skeleton (if missing)..."
@@ -31,10 +30,6 @@ for home in /home/*; do
   if [ ! -e "$user_cfg_dir/picom.conf" ]; then
     install -d -m 755 "$user_cfg_dir"
     install -m 644 config/picom.conf "$user_cfg_dir/picom.conf"
-  fi
-  if [ ! -e "$user_cfg_dir/config" ]; then
-    install -d -m 755 "$user_cfg_dir"
-    install -m 644 config/default.conf "$user_cfg_dir/config"
   fi
   if [ ! -e "$user_cfg_dir/config.toml" ]; then
     install -d -m 755 "$user_cfg_dir"
@@ -50,7 +45,7 @@ Next steps:
 1) Make sure dependencies are installed (xorg, libX11, picom, xterm or another terminal).
 2) Log out.
 3) In SDDM, choose "MimicWM" from the session list and log in.
-4) Optional: edit ~/.config/mimicwm/config and ~/.config/mimicwm/picom.conf.
+4) Optional: edit ~/.config/mimicwm/config.toml and ~/.config/mimicwm/picom.conf.
 
 Default key examples:
 - Super+Enter: terminal

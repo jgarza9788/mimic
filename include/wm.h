@@ -4,6 +4,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include "config.h"
 
@@ -63,6 +64,11 @@ typedef struct {
     int drag_win_w;
     int drag_win_h;
     Client *drag_client;
+
+    char runtime_toml_path[1024];
+    time_t runtime_toml_mtime;
+    char runtime_terminal[512];
+    char runtime_menu[512];
 } WM;
 
 extern WM wm;
