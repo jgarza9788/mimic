@@ -1,4 +1,5 @@
 #include <X11/XKBlib.h>
+#include <X11/keysym.h>
 #include <X11/Xutil.h>
 #include <ctype.h>
 #include <errno.h>
@@ -7,12 +8,64 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include "wm.h"
 
 WM wm = {0};
+
+typedef enum {
+    ACTION_SPAWN_TERMINAL,
+    ACTION_SPAWN_MENU,
+    ACTION_CLOSE_FOCUSED,
+    ACTION_FOCUS_PREV,
+    ACTION_FOCUS_NEXT,
+    ACTION_MOVE_UP,
+    ACTION_MOVE_DOWN,
+    ACTION_RESIZE_LEFT,
+    ACTION_RESIZE_RIGHT,
+    ACTION_RESIZE_UP,
+    ACTION_RESIZE_DOWN,
+    ACTION_SET_WORKSPACE,
+    ACTION_MOVE_TO_WORKSPACE,
+    ACTION_TOGGLE_FULLSCREEN,
+    ACTION_MINIMIZE,
+    ACTION_RESTORE_MINIMIZED,
+    ACTION_TOGGLE_FLOATING
+} Action;
+
+typedef struct {
+    KeySym sym;
+    unsigned int mod;
+    Action action;
+    int arg;
+} KeyBinding;
+
+static const KeyBinding keybindings[] = {
+    {XK_Return, MOD_MASK, ACTION_SPAWN_TERMINAL, 0},
+    {XK_r, MOD_MASK, ACTION_SPAWN_MENU, 0},
+    {XK_q, MOD_MASK, ACTION_CLOSE_FOCUSED, 0},
+    {XK_Left, MOD_MASK, ACTION_FOCUS_PREV, 0},
+    {XK_Right, MOD_MASK, ACTION_FOCUS_NEXT, 0},
+    {XK_Up, MOD_MASK, ACTION_MOVE_UP, 0},
+    {XK_Down, MOD_MASK, ACTION_MOVE_DOWN, 0},
+    {XK_Left, MOD_MASK | ShiftMask, ACTION_RESIZE_LEFT, 0},
+    {XK_Right, MOD_MASK | ShiftMask, ACTION_RESIZE_RIGHT, 0},
+    {XK_Up, MOD_MASK | ShiftMask, ACTION_RESIZE_UP, 0},
+    {XK_Down, MOD_MASK | ShiftMask, ACTION_RESIZE_DOWN, 0},
+    {XK_f, MOD_MASK, ACTION_TOGGLE_FULLSCREEN, 0},
+    {XK_m, MOD_MASK, ACTION_MINIMIZE, 0},
+    {XK_m, MOD_MASK | ShiftMask, ACTION_RESTORE_MINIMIZED, 0},
+    {XK_space, MOD_MASK, ACTION_TOGGLE_FLOATING, 0},
+    {XK_1, MOD_MASK, ACTION_SET_WORKSPACE, 0},
+    {XK_2, MOD_MASK, ACTION_SET_WORKSPACE, 1},
+    {XK_3, MOD_MASK, ACTION_SET_WORKSPACE, 2},
+    {XK_4, MOD_MASK, ACTION_SET_WORKSPACE, 3},
+    {XK_1, MOD_MASK | ShiftMask, ACTION_MOVE_TO_WORKSPACE, 0},
+    {XK_2, MOD_MASK | ShiftMask, ACTION_MOVE_TO_WORKSPACE, 1},
+    {XK_3, MOD_MASK | ShiftMask, ACTION_MOVE_TO_WORKSPACE, 2},
+    {XK_4, MOD_MASK | ShiftMask, ACTION_MOVE_TO_WORKSPACE, 3},
+};
 
 static void die(const char *msg) {
     fprintf(stderr, "mimicwm: %s\n", msg);
@@ -64,13 +117,13 @@ static void trim_trailing_whitespace(char *s) {
     }
 }
 
-static void copy_config_value(char *dest, size_t dest_size, const char *src) {
+static bool copy_config_value(char *dest, size_t dest_size, const char *src) {
     if (!dest || dest_size == 0) {
-        return;
+        return false;
     }
     dest[0] = '\0';
     if (!src) {
-        return;
+        return false;
     }
 
     const char *start = src;
@@ -83,13 +136,16 @@ static void copy_config_value(char *dest, size_t dest_size, const char *src) {
     if (len >= 2 && start[0] == '"' && start[len - 1] == '"') {
         start++;
         len -= 2;
+    } else if (len > 0 && (start[0] == '"' || start[len - 1] == '"')) {
+        return false;
     }
+
     if (len >= dest_size) {
         len = dest_size - 1;
     }
-
     memcpy(dest, start, len);
     dest[len] = '\0';
+    return true;
 }
 
 static bool first_existing_path(char *dest, size_t dest_size, const char *const *candidates) {
@@ -123,21 +179,19 @@ static void resolve_runtime_config_path(char *out, size_t out_size) {
 }
 
 static void load_runtime_config(void) {
-    wm.runtime_terminal[0] = '\0';
-    wm.runtime_menu[0] = '\0';
-
+    RuntimeConfig candidate = wm.runtime_config;
     char path[sizeof(wm.runtime_toml_path)] = {0};
     resolve_runtime_config_path(path, sizeof(path));
+
     if (!path[0]) {
         wm.runtime_toml_path[0] = '\0';
-        wm.runtime_toml_mtime = 0;
+        wm.runtime_toml_mtime_sec = 0;
         return;
     }
 
     struct stat st = {0};
     if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
-        wm.runtime_toml_path[0] = '\0';
-        wm.runtime_toml_mtime = 0;
+        fprintf(stderr, "mimicwm: config file unavailable: %s\n", path);
         return;
     }
 
@@ -147,8 +201,11 @@ static void load_runtime_config(void) {
         return;
     }
 
+    bool parse_error = false;
     bool in_commands = false;
+    bool in_picom = false;
     char line[2048] = {0};
+
     while (fgets(line, sizeof(line), fp)) {
         trim_trailing_whitespace(line);
         const char *p = line;
@@ -159,28 +216,45 @@ static void load_runtime_config(void) {
 
         if (*p == '[') {
             in_commands = strncmp(p, "[commands]", 10) == 0;
-            continue;
-        }
-        if (!in_commands) {
+            in_picom = strncmp(p, "[picom]", 7) == 0;
             continue;
         }
 
-        if (strncmp(p, "terminal", 8) == 0) {
-            const char *eq = strchr(p, '=');
-            if (eq) {
-                copy_config_value(wm.runtime_terminal, sizeof(wm.runtime_terminal), eq + 1);
+        const char *eq = strchr(p, '=');
+        if ((in_commands || in_picom) && !eq) {
+            parse_error = true;
+            fprintf(stderr, "mimicwm: parse error in %s: expected key=value near '%s'\n", path, p);
+            continue;
+        }
+
+        if (in_commands && strncmp(p, "terminal", 8) == 0) {
+            if (!copy_config_value(candidate.terminal, sizeof(candidate.terminal), eq + 1)) {
+                parse_error = true;
+                fprintf(stderr, "mimicwm: invalid commands.terminal in %s\n", path);
             }
-        } else if (strncmp(p, "menu", 4) == 0) {
-            const char *eq = strchr(p, '=');
-            if (eq) {
-                copy_config_value(wm.runtime_menu, sizeof(wm.runtime_menu), eq + 1);
+        } else if (in_commands && strncmp(p, "menu", 4) == 0) {
+            if (!copy_config_value(candidate.menu, sizeof(candidate.menu), eq + 1)) {
+                parse_error = true;
+                fprintf(stderr, "mimicwm: invalid commands.menu in %s\n", path);
+            }
+        } else if (in_picom && strncmp(p, "backend", 7) == 0) {
+            if (!copy_config_value(candidate.picom_backend, sizeof(candidate.picom_backend), eq + 1)) {
+                parse_error = true;
+                fprintf(stderr, "mimicwm: invalid picom.backend in %s\n", path);
             }
         }
     }
 
     fclose(fp);
+
+    if (parse_error) {
+        fprintf(stderr, "mimicwm: keeping previous runtime config due to parse errors in %s\n", path);
+        return;
+    }
+
+    wm.runtime_config = candidate;
     snprintf(wm.runtime_toml_path, sizeof(wm.runtime_toml_path), "%s", path);
-    wm.runtime_toml_mtime = st.st_mtime;
+    wm.runtime_toml_mtime_sec = st.st_mtime;
 }
 
 static void reload_runtime_config_if_changed(void) {
@@ -202,8 +276,10 @@ static void reload_runtime_config_if_changed(void) {
         return;
     }
 
+    time_t sec = st.st_mtime;
+
     if (strncmp(path, wm.runtime_toml_path, sizeof(wm.runtime_toml_path)) != 0 ||
-        st.st_mtime != wm.runtime_toml_mtime) {
+        sec != wm.runtime_toml_mtime_sec) {
         load_runtime_config();
     }
 }
@@ -302,35 +378,26 @@ static void spawn_first_available(const char *preferred, const char *const *fall
 
 static void spawn_terminal(void) {
     static const char *const fallbacks[] = {
-        "xterm",
-        "x-terminal-emulator",
-        "alacritty",
-        "kitty",
-        "wezterm",
-        "gnome-terminal",
-        "konsole",
-        "xfce4-terminal",
-        NULL,
+        "xterm", "x-terminal-emulator", "alacritty", "kitty", "wezterm", "gnome-terminal", "konsole", "xfce4-terminal", NULL,
     };
     const char *preferred = getenv("MIMICWM_TERMINAL");
     if (!preferred || !*preferred) {
-        preferred = wm.runtime_terminal[0] ? wm.runtime_terminal : TERMINAL_CMD;
+        preferred = wm.runtime_config.terminal[0] ? wm.runtime_config.terminal : TERMINAL_CMD;
     }
     spawn_first_available(preferred, fallbacks);
 }
 
 static void spawn_menu(void) {
-    static const char *const fallbacks[] = {
-        "dmenu_run",
-        "rofi -show drun",
-        "wofi --show drun",
-        NULL,
-    };
+    static const char *const fallbacks[] = {"dmenu_run", "rofi -show drun", "wofi --show drun", NULL};
     const char *preferred = getenv("MIMICWM_MENU");
     if (!preferred || !*preferred) {
-        preferred = wm.runtime_menu[0] ? wm.runtime_menu : MENU_CMD;
+        preferred = wm.runtime_config.menu[0] ? wm.runtime_config.menu : MENU_CMD;
     }
     spawn_first_available(preferred, fallbacks);
+}
+
+static WorkspaceState *current_workspace_state(void) {
+    return &wm.workspaces[wm.current_workspace];
 }
 
 static Client *find_client(Window w) {
@@ -344,6 +411,51 @@ static Client *find_client(Window w) {
 
 static bool is_visible(Client *c) {
     return c && !c->is_minimized && c->workspace == wm.current_workspace;
+}
+
+static bool is_scroll_managed(Client *c) {
+    return c && !c->is_floating && !c->is_transient;
+}
+
+static void workspace_attach_tail(WorkspaceState *ws, Client *c) {
+    c->ws_prev = NULL;
+    c->ws_next = NULL;
+
+    if (!ws->scroll_head) {
+        ws->scroll_head = c;
+        return;
+    }
+
+    Client *tail = ws->scroll_head;
+    while (tail->ws_next) {
+        tail = tail->ws_next;
+    }
+    tail->ws_next = c;
+    c->ws_prev = tail;
+}
+
+static void workspace_detach(Client *c) {
+    WorkspaceState *ws = &wm.workspaces[c->workspace];
+
+    if (ws->scroll_head == c) {
+        ws->scroll_head = c->ws_next;
+    }
+    if (ws->scroll_focus == c) {
+        ws->scroll_focus = c->ws_next ? c->ws_next : c->ws_prev;
+    }
+    if (ws->min_restore_cursor == c) {
+        ws->min_restore_cursor = NULL;
+    }
+
+    if (c->ws_prev) {
+        c->ws_prev->ws_next = c->ws_next;
+    }
+    if (c->ws_next) {
+        c->ws_next->ws_prev = c->ws_prev;
+    }
+
+    c->ws_prev = NULL;
+    c->ws_next = NULL;
 }
 
 static void update_current_desktop(void) {
@@ -378,10 +490,19 @@ static void set_input_focus(Client *c) {
         return;
     }
 
+    if (wm.focused && wm.focused != c) {
+        XSetWindowBorder(wm.dpy, wm.focused->win, wm.border_normal);
+    }
+
     wm.focused = c;
     XSetWindowBorder(wm.dpy, c->win, wm.border_focus);
     XSetInputFocus(wm.dpy, c->win, RevertToPointerRoot, CurrentTime);
     XRaiseWindow(wm.dpy, c->win);
+
+    WorkspaceState *ws = &wm.workspaces[c->workspace];
+    if (is_scroll_managed(c)) {
+        ws->scroll_focus = c;
+    }
 
     unsigned long active = c->win;
     XChangeProperty(wm.dpy,
@@ -394,65 +515,58 @@ static void set_input_focus(Client *c) {
                     1);
 }
 
-static void focus_next(void) {
-    if (!wm.clients) {
+static Client *workspace_find_first_focusable(WorkspaceState *ws) {
+    for (Client *c = ws->scroll_head; c; c = c->ws_next) {
+        if (is_visible(c) && is_scroll_managed(c) && !c->is_fullscreen) {
+            return c;
+        }
+    }
+    return NULL;
+}
+
+static void focus_scroll_relative(int direction) {
+    WorkspaceState *ws = current_workspace_state();
+    Client *start = ws->scroll_focus;
+
+    if (!start || !is_visible(start) || !is_scroll_managed(start) || start->is_fullscreen) {
+        start = workspace_find_first_focusable(ws);
+    }
+    if (!start) {
         return;
     }
 
-    Client *start = wm.focused ? wm.focused->next : wm.clients;
     Client *c = start;
-    while (c && !is_visible(c)) {
-        c = c->next;
-    }
-
-    if (!c) {
-        c = wm.clients;
-        while (c && !is_visible(c)) {
-            c = c->next;
-        }
-    }
-
-    if (wm.focused && wm.focused != c) {
-        XSetWindowBorder(wm.dpy, wm.focused->win, wm.border_normal);
-    }
-    if (c) {
-        set_input_focus(c);
-    }
-}
-
-static void focus_prev(void) {
-    Client *prev = NULL;
-    Client *target = NULL;
-    for (Client *c = wm.clients; c; c = c->next) {
-        if (!is_visible(c)) {
-            continue;
-        }
-        if (c == wm.focused) {
-            break;
-        }
-        prev = c;
-    }
-    if (prev) {
-        target = prev;
-    } else {
-        for (Client *c = wm.clients; c; c = c->next) {
-            if (is_visible(c)) {
-                target = c;
+    for (;;) {
+        c = (direction > 0) ? c->ws_next : c->ws_prev;
+        if (!c) {
+            c = (direction > 0) ? ws->scroll_head : NULL;
+            if (direction < 0) {
+                c = ws->scroll_head;
+                if (!c) {
+                    break;
+                }
+                while (c->ws_next) {
+                    c = c->ws_next;
+                }
             }
         }
+
+        if (!c || c == start) {
+            break;
+        }
+
+        if (is_visible(c) && is_scroll_managed(c) && !c->is_fullscreen) {
+            set_input_focus(c);
+            return;
+        }
     }
 
-    if (wm.focused && wm.focused != target) {
-        XSetWindowBorder(wm.dpy, wm.focused->win, wm.border_normal);
-    }
-    if (target) {
-        set_input_focus(target);
-    }
+    set_input_focus(start);
 }
 
 static void update_visibility(void) {
     for (Client *c = wm.clients; c; c = c->next) {
-        if (is_visible(c) || c->is_fullscreen) {
+        if (is_visible(c)) {
             XMapWindow(wm.dpy, c->win);
         } else {
             XUnmapWindow(wm.dpy, c->win);
@@ -460,58 +574,111 @@ static void update_visibility(void) {
     }
 }
 
-static void tile_workspace(void) {
-    if (!wm.tiling_mode) {
+static Client *workspace_fullscreen_client(WorkspaceState *ws) {
+    for (Client *c = ws->scroll_head; c; c = c->ws_next) {
+        if (is_visible(c) && c->is_fullscreen) {
+            return c;
+        }
+    }
+
+    for (Client *c = wm.clients; c; c = c->next) {
+        if (is_visible(c) && c->is_floating && c->is_fullscreen) {
+            return c;
+        }
+    }
+    return NULL;
+}
+
+static void arrange_scroll_workspace(WorkspaceState *ws) {
+    Client *focused = ws->scroll_focus;
+    if (!focused || !is_visible(focused) || !is_scroll_managed(focused) || focused->is_fullscreen) {
+        focused = workspace_find_first_focusable(ws);
+        ws->scroll_focus = focused;
+    }
+
+    if (!focused) {
         return;
     }
 
-    int count = 0;
-    for (Client *c = wm.clients; c; c = c->next) {
-        if (!is_visible(c) || c->is_floating || c->is_fullscreen) {
+    const int gap = 24;
+    const int ypad = 24;
+    const int main_w = (int)(wm.sw * 0.78);
+    const int side_w = (int)(wm.sw * 0.58);
+    const int main_h = (int)wm.sh - (2 * ypad) - 2 * BORDER_WIDTH;
+    const int side_h = (int)wm.sh - (2 * ypad) - 2 * BORDER_WIDTH;
+    const int center_x = ((int)wm.sw - main_w) / 2;
+
+    focused->x = center_x;
+    focused->y = ypad;
+    focused->w = main_w - 2 * BORDER_WIDTH;
+    focused->h = main_h;
+    XMoveResizeWindow(wm.dpy, focused->win, focused->x, focused->y, focused->w, focused->h);
+
+    int left_x = center_x - gap - side_w;
+    for (Client *c = focused->ws_prev; c; c = c->ws_prev) {
+        if (!is_visible(c) || !is_scroll_managed(c) || c->is_fullscreen) {
             continue;
         }
-        count++;
-    }
-
-    if (count == 0) {
-        return;
-    }
-
-    int master_w = wm.sw * 3 / 5;
-    int stack_w = wm.sw - master_w;
-    int idx = 0;
-    int stack_n = count - 1;
-
-    for (Client *c = wm.clients; c; c = c->next) {
-        if (!is_visible(c) || c->is_floating || c->is_fullscreen) {
-            continue;
-        }
-
-        if (idx == 0) {
-            c->x = 0;
-            c->y = 0;
-            c->w = master_w - 2 * BORDER_WIDTH;
-            c->h = wm.sh - 2 * BORDER_WIDTH;
-        } else {
-            int h = wm.sh / (stack_n > 0 ? stack_n : 1);
-            c->x = master_w;
-            c->y = (idx - 1) * h;
-            c->w = stack_w - 2 * BORDER_WIDTH;
-            c->h = h - 2 * BORDER_WIDTH;
-        }
-
+        c->x = left_x;
+        c->y = ypad;
+        c->w = side_w - 2 * BORDER_WIDTH;
+        c->h = side_h;
         XMoveResizeWindow(wm.dpy, c->win, c->x, c->y, c->w, c->h);
-        idx++;
+        left_x -= side_w + gap;
+    }
+
+    int right_x = center_x + main_w + gap;
+    for (Client *c = focused->ws_next; c; c = c->ws_next) {
+        if (!is_visible(c) || !is_scroll_managed(c) || c->is_fullscreen) {
+            continue;
+        }
+        c->x = right_x;
+        c->y = ypad;
+        c->w = side_w - 2 * BORDER_WIDTH;
+        c->h = side_h;
+        XMoveResizeWindow(wm.dpy, c->win, c->x, c->y, c->w, c->h);
+        right_x += side_w + gap;
     }
 }
 
 static void arrange(void) {
     update_visibility();
-    tile_workspace();
 
-    if (!wm.focused || !is_visible(wm.focused)) {
-        focus_next();
+    WorkspaceState *ws = current_workspace_state();
+    Client *fullscreen = workspace_fullscreen_client(ws);
+    if (fullscreen) {
+        fullscreen->x = 0;
+        fullscreen->y = 0;
+        fullscreen->w = (int)wm.sw;
+        fullscreen->h = (int)wm.sh;
+        XMoveResizeWindow(wm.dpy, fullscreen->win, fullscreen->x, fullscreen->y, fullscreen->w, fullscreen->h);
+        XRaiseWindow(wm.dpy, fullscreen->win);
+        set_input_focus(fullscreen);
+    } else {
+        arrange_scroll_workspace(ws);
+
+        for (Client *c = wm.clients; c; c = c->next) {
+            if (!is_visible(c) || !c->is_floating || c->is_minimized || c->is_fullscreen) {
+                continue;
+            }
+            XMoveResizeWindow(wm.dpy, c->win, c->x, c->y, c->w, c->h);
+            XRaiseWindow(wm.dpy, c->win);
+        }
+
+        if (!wm.focused || !is_visible(wm.focused)) {
+            if (ws->scroll_focus && is_visible(ws->scroll_focus)) {
+                set_input_focus(ws->scroll_focus);
+            } else {
+                for (Client *c = wm.clients; c; c = c->next) {
+                    if (is_visible(c)) {
+                        set_input_focus(c);
+                        break;
+                    }
+                }
+            }
+        }
     }
+
     XFlush(wm.dpy);
 }
 
@@ -570,7 +737,6 @@ static Client *manage(Window w) {
     c->w = wa.width;
     c->h = wa.height;
     c->workspace = wm.current_workspace;
-    c->is_floating = true;
 
     XWMHints *hints = XGetWMHints(wm.dpy, w);
     if (hints && (hints->flags & StateHint) && hints->initial_state == IconicState) {
@@ -594,6 +760,15 @@ static Client *manage(Window w) {
 
     c->next = wm.clients;
     wm.clients = c;
+
+    WorkspaceState *ws = current_workspace_state();
+    if (!c->is_floating) {
+        workspace_attach_tail(ws, c);
+        if (!ws->scroll_focus) {
+            ws->scroll_focus = c;
+        }
+    }
+
     set_client_desktop(c);
 
     if (!c->is_minimized) {
@@ -607,6 +782,10 @@ static Client *manage(Window w) {
 static void unmanage(Client *c) {
     if (!c) {
         return;
+    }
+
+    if (!c->is_floating) {
+        workspace_detach(c);
     }
 
     if (wm.focused == c) {
@@ -664,10 +843,6 @@ static void client_toggle_fullscreen(Client *c) {
         c->oldy = c->y;
         c->oldw = c->w;
         c->oldh = c->h;
-        c->x = 0;
-        c->y = 0;
-        c->w = wm.sw;
-        c->h = wm.sh;
     } else {
         c->x = c->oldx;
         c->y = c->oldy;
@@ -689,12 +864,18 @@ static void client_toggle_fullscreen(Client *c) {
         XDeleteProperty(wm.dpy, c->win, wm.net_wm_state);
     }
 
-    XMoveResizeWindow(wm.dpy, c->win, c->x, c->y, c->w, c->h);
-    XRaiseWindow(wm.dpy, c->win);
+    arrange();
+}
+
+static bool can_floating_move_resize(Client *c) {
+    if (!c || c->is_fullscreen) {
+        return false;
+    }
+    return c->is_floating || c->is_transient;
 }
 
 static void client_move(Client *c, int dx, int dy) {
-    if (!c || c->is_fullscreen) {
+    if (!can_floating_move_resize(c)) {
         return;
     }
     c->x += dx;
@@ -703,7 +884,7 @@ static void client_move(Client *c, int dx, int dy) {
 }
 
 static void client_resize(Client *c, int dw, int dh) {
-    if (!c || c->is_fullscreen) {
+    if (!can_floating_move_resize(c)) {
         return;
     }
     c->w += dw;
@@ -719,18 +900,41 @@ static void client_minimize(Client *c) {
     }
     c->is_minimized = true;
     XUnmapWindow(wm.dpy, c->win);
-    focus_next();
+    if (wm.focused == c) {
+        wm.focused = NULL;
+    }
+    arrange();
 }
 
 static void client_restore_last(void) {
-    for (Client *c = wm.clients; c; c = c->next) {
+    WorkspaceState *ws = current_workspace_state();
+    Client *start = ws->min_restore_cursor ? ws->min_restore_cursor : wm.clients;
+
+    Client *candidate = NULL;
+    for (Client *c = start; c; c = c->next) {
         if (c->workspace == wm.current_workspace && c->is_minimized) {
-            c->is_minimized = false;
-            XMapRaised(wm.dpy, c->win);
-            set_input_focus(c);
-            return;
+            candidate = c;
+            break;
         }
     }
+    if (!candidate) {
+        for (Client *c = wm.clients; c && c != start; c = c->next) {
+            if (c->workspace == wm.current_workspace && c->is_minimized) {
+                candidate = c;
+                break;
+            }
+        }
+    }
+
+    if (!candidate) {
+        return;
+    }
+
+    candidate->is_minimized = false;
+    ws->min_restore_cursor = candidate->next;
+    XMapRaised(wm.dpy, candidate->win);
+    set_input_focus(candidate);
+    arrange();
 }
 
 static void set_workspace(int ws) {
@@ -739,6 +943,7 @@ static void set_workspace(int ws) {
     }
     wm.current_workspace = ws;
     update_current_desktop();
+    wm.focused = NULL;
     arrange();
 }
 
@@ -746,31 +951,74 @@ static void move_client_workspace(Client *c, int ws) {
     if (!c || ws < 0 || ws >= WORKSPACE_COUNT) {
         return;
     }
+
+    if (!c->is_floating) {
+        workspace_detach(c);
+    }
+
     c->workspace = ws;
     c->is_minimized = false;
+
+    if (!c->is_floating) {
+        WorkspaceState *target = &wm.workspaces[ws];
+        workspace_attach_tail(target, c);
+        if (!target->scroll_focus) {
+            target->scroll_focus = c;
+        }
+    }
+
     set_client_desktop(c);
     if (ws != wm.current_workspace) {
         XUnmapWindow(wm.dpy, c->win);
-        focus_next();
+        if (wm.focused == c) {
+            wm.focused = NULL;
+        }
     }
     arrange();
+}
+
+static unsigned int clean_mod_mask(unsigned int state) {
+    return state & ~(LockMask | wm.numlock_mask);
+}
+
+static void detect_numlock_mask(void) {
+    wm.numlock_mask = 0;
+    XModifierKeymap *modmap = XGetModifierMapping(wm.dpy);
+    if (!modmap) {
+        return;
+    }
+
+    KeyCode numlock = XKeysymToKeycode(wm.dpy, XK_Num_Lock);
+    for (int mod = 0; mod < 8; mod++) {
+        for (int k = 0; k < modmap->max_keypermod; k++) {
+            KeyCode code = modmap->modifiermap[mod * modmap->max_keypermod + k];
+            if (code == numlock) {
+                wm.numlock_mask = (1u << mod);
+            }
+        }
+    }
+
+    XFreeModifiermap(modmap);
 }
 
 static void grab_keys(void) {
     XUngrabKey(wm.dpy, AnyKey, AnyModifier, wm.root);
 
-    int mods[] = {0, LockMask, Mod2Mask, LockMask | Mod2Mask};
-    KeySym keys[] = {
-        XK_Return, XK_q, XK_space, XK_f, XK_m, XK_r,
-        XK_Left, XK_Right, XK_Up, XK_Down,
-        XK_1, XK_2, XK_3, XK_4
-    };
+    unsigned int modifiers[] = {0, LockMask, wm.numlock_mask, LockMask | wm.numlock_mask};
 
-    for (size_t i = 0; i < sizeof(keys)/sizeof(keys[0]); i++) {
-        KeyCode code = XKeysymToKeycode(wm.dpy, keys[i]);
-        for (size_t m = 0; m < sizeof(mods)/sizeof(mods[0]); m++) {
-            XGrabKey(wm.dpy, code, MOD_MASK | mods[m], wm.root, True, GrabModeAsync, GrabModeAsync);
-            XGrabKey(wm.dpy, code, MOD_MASK | ShiftMask | mods[m], wm.root, True, GrabModeAsync, GrabModeAsync);
+    for (size_t i = 0; i < sizeof(keybindings) / sizeof(keybindings[0]); i++) {
+        KeyCode code = XKeysymToKeycode(wm.dpy, keybindings[i].sym);
+        if (!code) {
+            continue;
+        }
+        for (size_t m = 0; m < sizeof(modifiers) / sizeof(modifiers[0]); m++) {
+            XGrabKey(wm.dpy,
+                     code,
+                     keybindings[i].mod | modifiers[m],
+                     wm.root,
+                     True,
+                     GrabModeAsync,
+                     GrabModeAsync);
         }
     }
 }
@@ -778,8 +1026,8 @@ static void grab_keys(void) {
 static void grab_buttons(void) {
     XUngrabButton(wm.dpy, AnyButton, AnyModifier, wm.root);
 
-    int mods[] = {MOD_MASK, MOD_MASK | LockMask, MOD_MASK | Mod2Mask, MOD_MASK | LockMask | Mod2Mask};
-    for (size_t i = 0; i < sizeof(mods)/sizeof(mods[0]); i++) {
+    unsigned int mods[] = {MOD_MASK, MOD_MASK | LockMask, MOD_MASK | wm.numlock_mask, MOD_MASK | LockMask | wm.numlock_mask};
+    for (size_t i = 0; i < sizeof(mods) / sizeof(mods[0]); i++) {
         XGrabButton(wm.dpy,
                     Button1,
                     mods[i],
@@ -804,68 +1052,95 @@ static void grab_buttons(void) {
     }
 }
 
-static void keypress(XKeyEvent *e) {
-    if (!(e->state & MOD_MASK)) {
-        return;
+static void dispatch_action(Action action, int arg) {
+    switch (action) {
+        case ACTION_SPAWN_TERMINAL:
+            spawn_terminal();
+            break;
+        case ACTION_SPAWN_MENU:
+            spawn_menu();
+            break;
+        case ACTION_CLOSE_FOCUSED:
+            client_close(wm.focused);
+            break;
+        case ACTION_FOCUS_PREV:
+            focus_scroll_relative(-1);
+            arrange();
+            break;
+        case ACTION_FOCUS_NEXT:
+            focus_scroll_relative(1);
+            arrange();
+            break;
+        case ACTION_MOVE_UP:
+            client_move(wm.focused, 0, -MOVE_STEP);
+            break;
+        case ACTION_MOVE_DOWN:
+            client_move(wm.focused, 0, MOVE_STEP);
+            break;
+        case ACTION_RESIZE_LEFT:
+            client_resize(wm.focused, -RESIZE_STEP, 0);
+            break;
+        case ACTION_RESIZE_RIGHT:
+            client_resize(wm.focused, RESIZE_STEP, 0);
+            break;
+        case ACTION_RESIZE_UP:
+            client_resize(wm.focused, 0, -RESIZE_STEP);
+            break;
+        case ACTION_RESIZE_DOWN:
+            client_resize(wm.focused, 0, RESIZE_STEP);
+            break;
+        case ACTION_SET_WORKSPACE:
+            set_workspace(arg);
+            break;
+        case ACTION_MOVE_TO_WORKSPACE:
+            move_client_workspace(wm.focused, arg);
+            break;
+        case ACTION_TOGGLE_FULLSCREEN:
+            client_toggle_fullscreen(wm.focused);
+            break;
+        case ACTION_MINIMIZE:
+            client_minimize(wm.focused);
+            break;
+        case ACTION_RESTORE_MINIMIZED:
+            client_restore_last();
+            break;
+        case ACTION_TOGGLE_FLOATING:
+            if (wm.focused && !wm.focused->is_transient) {
+                if (wm.focused->is_floating) {
+                    wm.focused->is_floating = false;
+                    workspace_attach_tail(current_workspace_state(), wm.focused);
+                    current_workspace_state()->scroll_focus = wm.focused;
+                } else {
+                    workspace_detach(wm.focused);
+                    wm.focused->is_floating = true;
+                }
+                arrange();
+            }
+            break;
     }
+}
+
+static void keypress(XKeyEvent *e) {
     reload_runtime_config_if_changed();
 
     KeySym sym = XLookupKeysym(e, 0);
-    bool shift = e->state & ShiftMask;
+    unsigned int clean = clean_mod_mask(e->state);
 
-    if (sym == XK_Return && !shift) {
-        spawn_terminal();
-    } else if (sym == XK_r && !shift) {
-        spawn_menu();
-    } else if (sym == XK_q && !shift) {
-        client_close(wm.focused);
-    } else if (sym == XK_f && !shift) {
-        client_toggle_fullscreen(wm.focused);
-    } else if (sym == XK_space && !shift) {
-        wm.tiling_mode = !wm.tiling_mode;
-        for (Client *c = wm.clients; c; c = c->next) {
-            if (!c->is_transient) {
-                c->is_floating = !wm.tiling_mode;
-            }
-        }
-        arrange();
-    } else if (sym == XK_m && !shift) {
-        client_minimize(wm.focused);
-    } else if (sym == XK_m && shift) {
-        client_restore_last();
-    } else if (sym == XK_Left && !shift) {
-        focus_prev();
-    } else if (sym == XK_Right && !shift) {
-        focus_next();
-    } else if (sym == XK_Up && !shift) {
-        client_move(wm.focused, 0, -MOVE_STEP);
-    } else if (sym == XK_Down && !shift) {
-        client_move(wm.focused, 0, MOVE_STEP);
-    } else if (sym == XK_Left && shift) {
-        client_resize(wm.focused, -RESIZE_STEP, 0);
-    } else if (sym == XK_Right && shift) {
-        client_resize(wm.focused, RESIZE_STEP, 0);
-    } else if (sym == XK_Up && shift) {
-        client_resize(wm.focused, 0, -RESIZE_STEP);
-    } else if (sym == XK_Down && shift) {
-        client_resize(wm.focused, 0, RESIZE_STEP);
-    } else if (sym >= XK_1 && sym <= XK_4) {
-        int ws = (int)(sym - XK_1);
-        if (shift) {
-            move_client_workspace(wm.focused, ws);
-        } else {
-            set_workspace(ws);
+    for (size_t i = 0; i < sizeof(keybindings) / sizeof(keybindings[0]); i++) {
+        if (keybindings[i].sym == sym && keybindings[i].mod == clean) {
+            dispatch_action(keybindings[i].action, keybindings[i].arg);
+            return;
         }
     }
 }
 
 static void buttonpress(XButtonEvent *e) {
-    if (!(e->state & MOD_MASK)) {
+    if (clean_mod_mask(e->state) != MOD_MASK) {
         return;
     }
 
     Client *c = find_client(e->subwindow ? e->subwindow : e->window);
-    if (!c || !is_visible(c)) {
+    if (!c || !is_visible(c) || !can_floating_move_resize(c)) {
         return;
     }
 
@@ -941,10 +1216,16 @@ static void configurerequest(XConfigureRequestEvent *e) {
 
     Client *c = find_client(e->window);
     if (c) {
-        if (e->value_mask & CWX) c->x = e->x;
-        if (e->value_mask & CWY) c->y = e->y;
-        if (e->value_mask & CWWidth) c->w = e->width;
-        if (e->value_mask & CWHeight) c->h = e->height;
+        if (can_floating_move_resize(c)) {
+            if (e->value_mask & CWX) c->x = e->x;
+            if (e->value_mask & CWY) c->y = e->y;
+            if (e->value_mask & CWWidth) c->w = e->width;
+            if (e->value_mask & CWHeight) c->h = e->height;
+            XConfigureWindow(wm.dpy, e->window, e->value_mask, &wc);
+        } else {
+            arrange();
+        }
+        return;
     }
 
     XConfigureWindow(wm.dpy, e->window, e->value_mask, &wc);
@@ -975,16 +1256,15 @@ static void unmapnotify(XUnmapEvent *e) {
 static void enternotify(XCrossingEvent *e) {
     Client *c = find_client(e->window);
     if (c && c != wm.focused && is_visible(c)) {
-        if (wm.focused) {
-            XSetWindowBorder(wm.dpy, wm.focused->win, wm.border_normal);
-        }
         set_input_focus(c);
+        if (is_scroll_managed(c)) {
+            arrange();
+        }
     }
 }
 
 static void clientmessage(XClientMessageEvent *e) {
     if (e->message_type == wm.net_active_window) {
-        /* Ignore focus-stealing requests from applications. */
         long source = e->data.l[0];
         if (source != 2) {
             return;
@@ -994,6 +1274,9 @@ static void clientmessage(XClientMessageEvent *e) {
         if (c) {
             set_workspace(c->workspace);
             set_input_focus(c);
+            if (is_scroll_managed(c)) {
+                arrange();
+            }
         }
         return;
     }
@@ -1039,13 +1322,11 @@ static void setup_atoms(void) {
     wm.net_wm_window_type = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE", False);
     wm.net_wm_window_type_dock = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
 
-    Atom supported[] = {
-        wm.net_active_window,
-        wm.net_wm_state,
-        wm.net_wm_state_fullscreen,
-        wm.net_wm_desktop,
-        wm.net_current_desktop
-    };
+    Atom supported[] = {wm.net_active_window,
+                        wm.net_wm_state,
+                        wm.net_wm_state_fullscreen,
+                        wm.net_wm_desktop,
+                        wm.net_current_desktop};
     XChangeProperty(wm.dpy,
                     wm.root,
                     wm.net_supported,
@@ -1094,6 +1375,7 @@ void wm_init(void) {
                      StructureNotifyMask | PropertyChangeMask | KeyPressMask);
 
     setup_atoms();
+    detect_numlock_mask();
     load_runtime_config();
     grab_keys();
     grab_buttons();
@@ -1106,6 +1388,8 @@ void wm_run(void) {
     XEvent ev;
 
     while (wm.running && !XNextEvent(wm.dpy, &ev)) {
+        reload_runtime_config_if_changed();
+
         switch (ev.type) {
             case KeyPress:
                 keypress(&ev.xkey);
