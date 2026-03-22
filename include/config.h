@@ -1,6 +1,8 @@
 #ifndef MIMIC_CONFIG_H
 #define MIMIC_CONFIG_H
 
+#include <xcb/xcb.h>
+
 #define WM_NAME "mimicwm"
 
 /* Core behavior */
@@ -10,7 +12,7 @@
 #define RESIZE_STEP 30
 
 /* Modifiers */
-#define MOD_MASK Mod4Mask
+#define MOD_MASK XCB_MOD_MASK_4
 
 /* Colors */
 #define COLOR_BORDER_FOCUS 0x66aaff

@@ -7,7 +7,12 @@ BUILD ?= release
 CSTD = -std=c11
 WARN = -Wall -Wextra -Wpedantic -Wshadow -Wformat=2
 CFLAGS_COMMON = $(CSTD) $(WARN) -Iinclude
-LDFLAGS_COMMON = -lX11 -lXext
+
+XCB_BASE_LIBS := -lxcb
+XCB_KEYSYMS_LIB := $(shell pkg-config --libs xcb-keysyms 2>/dev/null)
+XCB_ICCCM_LIB := $(shell pkg-config --libs xcb-icccm 2>/dev/null)
+XCB_EWMH_LIB := $(shell pkg-config --libs xcb-ewmh 2>/dev/null)
+LDFLAGS_COMMON = $(XCB_BASE_LIBS) $(XCB_KEYSYMS_LIB) $(XCB_ICCCM_LIB) $(XCB_EWMH_LIB)
 
 ifeq ($(BUILD),debug)
   CFLAGS = $(CFLAGS_COMMON) -O0 -g3 -DDEBUG
