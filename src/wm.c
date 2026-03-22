@@ -599,6 +599,16 @@ static void buttonpress(XButtonEvent *e) {
     wm.drag_win_w = c->w;
     wm.drag_win_h = c->h;
     wm.drag_client = c;
+
+    XGrabPointer(wm.dpy,
+                 wm.root,
+                 False,
+                 PointerMotionMask | ButtonReleaseMask,
+                 GrabModeAsync,
+                 GrabModeAsync,
+                 None,
+                 None,
+                 CurrentTime);
 }
 
 static void motionnotify(XMotionEvent *e) {
@@ -627,6 +637,7 @@ static void buttonrelease(XButtonEvent *e) {
     (void)e;
     wm.drag_active = false;
     wm.drag_client = NULL;
+    XUngrabPointer(wm.dpy, CurrentTime);
 }
 
 static void maprequest(XMapRequestEvent *e) {
@@ -693,6 +704,12 @@ static void enternotify(XCrossingEvent *e) {
 
 static void clientmessage(XClientMessageEvent *e) {
     if (e->message_type == wm.net_active_window) {
+        /* Ignore focus-stealing requests from applications. */
+        long source = e->data.l[0];
+        if (source != 2) {
+            return;
+        }
+
         Client *c = find_client(e->window);
         if (c) {
             set_workspace(c->workspace);
