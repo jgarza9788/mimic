@@ -1,5 +1,6 @@
 #include <X11/XKBlib.h>
 #include <X11/Xutil.h>
+#include <ctype.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -45,7 +46,78 @@ static unsigned long color_from_hex(unsigned int rgb) {
     return color.pixel;
 }
 
+static bool has_path_separator(const char *cmd) {
+    return cmd && strchr(cmd, '/') != NULL;
+}
+
+static void trim_leading_spaces(const char **p) {
+    while (**p && isspace((unsigned char)**p)) {
+        (*p)++;
+    }
+}
+
+static bool command_exists(const char *cmd) {
+    if (!cmd || !*cmd) {
+        return false;
+    }
+
+    const char *p = cmd;
+    trim_leading_spaces(&p);
+    if (!*p) {
+        return false;
+    }
+
+    size_t len = 0;
+    while (p[len] && !isspace((unsigned char)p[len])) {
+        len++;
+    }
+    if (len == 0 || len >= 512) {
+        return false;
+    }
+
+    char token[512] = {0};
+    memcpy(token, p, len);
+
+    if (has_path_separator(token)) {
+        return access(token, X_OK) == 0;
+    }
+
+    const char *path = getenv("PATH");
+    if (!path || !*path) {
+        path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+    }
+
+    const char *seg = path;
+    while (*seg) {
+        const char *end = strchr(seg, ':');
+        size_t dir_len = end ? (size_t)(end - seg) : strlen(seg);
+
+        char full[1024] = {0};
+        if (dir_len == 0) {
+            snprintf(full, sizeof(full), "%s", token);
+        } else {
+            snprintf(full, sizeof(full), "%.*s/%s", (int)dir_len, seg, token);
+        }
+
+        if (access(full, X_OK) == 0) {
+            return true;
+        }
+
+        if (!end) {
+            break;
+        }
+        seg = end + 1;
+    }
+
+    return false;
+}
+
 static void spawn(const char *cmd) {
+    if (!command_exists(cmd)) {
+        fprintf(stderr, "mimicwm: command not found: %s\n", cmd ? cmd : "(null)");
+        return;
+    }
+
     pid_t pid = fork();
     if (pid == 0) {
         if (wm.dpy) {
@@ -56,6 +128,57 @@ static void spawn(const char *cmd) {
         fprintf(stderr, "mimicwm: failed to exec '%s': %s\n", cmd, strerror(errno));
         _exit(EXIT_FAILURE);
     }
+}
+
+static void spawn_first_available(const char *preferred, const char *const *fallbacks) {
+    if (preferred && command_exists(preferred)) {
+        spawn(preferred);
+        return;
+    }
+
+    for (size_t i = 0; fallbacks[i]; i++) {
+        if (command_exists(fallbacks[i])) {
+            spawn(fallbacks[i]);
+            return;
+        }
+    }
+
+    fprintf(stderr,
+            "mimicwm: no suitable command found (preferred=%s)\n",
+            preferred ? preferred : "(null)");
+}
+
+static void spawn_terminal(void) {
+    static const char *const fallbacks[] = {
+        "xterm",
+        "x-terminal-emulator",
+        "alacritty",
+        "kitty",
+        "wezterm",
+        "gnome-terminal",
+        "konsole",
+        "xfce4-terminal",
+        NULL,
+    };
+    const char *preferred = getenv("MIMICWM_TERMINAL");
+    if (!preferred || !*preferred) {
+        preferred = TERMINAL_CMD;
+    }
+    spawn_first_available(preferred, fallbacks);
+}
+
+static void spawn_menu(void) {
+    static const char *const fallbacks[] = {
+        "dmenu_run",
+        "rofi -show drun",
+        "wofi --show drun",
+        NULL,
+    };
+    const char *preferred = getenv("MIMICWM_MENU");
+    if (!preferred || !*preferred) {
+        preferred = MENU_CMD;
+    }
+    spawn_first_available(preferred, fallbacks);
 }
 
 static Client *find_client(Window w) {
@@ -530,13 +653,17 @@ static void grab_buttons(void) {
 }
 
 static void keypress(XKeyEvent *e) {
-    KeySym sym = XkbKeycodeToKeysym(wm.dpy, e->keycode, 0, 0);
+    if (!(e->state & MOD_MASK)) {
+        return;
+    }
+
+    KeySym sym = XLookupKeysym(e, 0);
     bool shift = e->state & ShiftMask;
 
     if (sym == XK_Return && !shift) {
-        spawn(TERMINAL_CMD);
+        spawn_terminal();
     } else if (sym == XK_r && !shift) {
-        spawn(MENU_CMD);
+        spawn_menu();
     } else if (sym == XK_q && !shift) {
         client_close(wm.focused);
     } else if (sym == XK_f && !shift) {

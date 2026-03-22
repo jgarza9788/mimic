@@ -32,7 +32,7 @@ This is a minimal but usable first version with:
 
 - No built-in status bar.
 - No advanced tiling tree; tiling mode is a basic master/stack layout.
-- No dynamic keybinding parser yet (bindings are compile-time in `include/config.h` + WM source).
+- Keybindings are fixed in this version, but all defaults are documented in `config/config.toml`.
 - No multi-monitor placement logic yet.
 
 ## Repository layout
@@ -183,7 +183,7 @@ DISPLAY=:2 xterm
   - mod key
   - default terminal/menu commands
 - Session script runtime config:
-  - `~/.config/mimicwm/config` (optional shell vars)
+  - `~/.config/mimicwm/config.toml` (commands + hotkeys + picom backend)
   - `~/.config/mimicwm/picom.conf`
 
 ## How picom is used
@@ -191,7 +191,8 @@ DISPLAY=:2 xterm
 MimicWM does not implement compositing internally.
 
 - The script `scripts/start-mimicwm-session.sh` checks for `picom`.
-- If found, it starts picom with user config (`~/.config/mimicwm/picom.conf`) when present.
+- In `config.toml`, `picom.backend = "auto"` tries `glx` first (GPU acceleration) and falls back to `xrender`.
+- If a user picom config exists (`~/.config/mimicwm/picom.conf`), it is used automatically.
 - The WM remains independent and still runs without picom.
 
 ## Troubleshooting
@@ -202,7 +203,8 @@ MimicWM does not implement compositing internally.
 - **Could not acquire WM control**:
   - another WM is already running on that display.
 - **No terminal on `Super+Enter`**:
-  - install `xterm` or rebuild with a different `TERMINAL_CMD` in `include/config.h`.
+  - set `commands.terminal` in `~/.config/mimicwm/config.toml`.
+  - MimicWM also tries common terminal fallbacks (`xterm`, `alacritty`, `kitty`, etc.).
 - **No transparency/shadows**:
   - ensure picom is installed and running.
 
