@@ -1,14 +1,21 @@
 #ifndef MIMIC_WM_H
 #define MIMIC_WM_H
 
-#include <X11/Xlib.h>
 #include <X11/Xatom.h>
+#include <X11/Xlib.h>
 #include <stdbool.h>
 #include <time.h>
 
 #include "config.h"
 
 typedef struct Client Client;
+typedef struct WorkspaceState WorkspaceState;
+
+typedef struct {
+    char terminal[512];
+    char menu[512];
+    char picom_backend[64];
+} RuntimeConfig;
 
 struct Client {
     Window win;
@@ -26,6 +33,14 @@ struct Client {
     bool is_transient;
     bool is_minimized;
     Client *next;
+    Client *ws_prev;
+    Client *ws_next;
+};
+
+struct WorkspaceState {
+    Client *scroll_head;
+    Client *scroll_focus;
+    Client *min_restore_cursor;
 };
 
 typedef struct {
@@ -51,9 +66,9 @@ typedef struct {
     Client *clients;
     Client *focused;
 
+    WorkspaceState workspaces[WORKSPACE_COUNT];
     int current_workspace;
     bool running;
-    bool tiling_mode;
 
     bool drag_active;
     bool drag_resize;
@@ -65,10 +80,11 @@ typedef struct {
     int drag_win_h;
     Client *drag_client;
 
+    unsigned int numlock_mask;
+
     char runtime_toml_path[1024];
-    time_t runtime_toml_mtime;
-    char runtime_terminal[512];
-    char runtime_menu[512];
+    time_t runtime_toml_mtime_sec;
+    RuntimeConfig runtime_config;
 } WM;
 
 extern WM wm;
