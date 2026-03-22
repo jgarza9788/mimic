@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=MimicWM
+Comment=Simple floating-first X11/XLibre window manager
+Exec=/usr/local/share/mimicwm/start-mimicwm-session.sh
+TryExec=/usr/local/bin/mimicwm
+Type=Application
+DesktopNames=MimicWM
+X-LightDM-DesktopName=MimicWM
