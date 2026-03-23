@@ -42,32 +42,33 @@ typedef struct {
     uint16_t mod;
     Action action;
     int arg;
+    xcb_keycode_t keycode;
 } KeyBinding;
 
-static const KeyBinding keybindings[] = {
-    {XK_Return, MOD_MASK, ACTION_SPAWN_TERMINAL, 0},
-    {XK_r, MOD_MASK, ACTION_SPAWN_MENU, 0},
-    {XK_q, MOD_MASK, ACTION_CLOSE_FOCUSED, 0},
-    {XK_Left, MOD_MASK, ACTION_FOCUS_PREV, 0},
-    {XK_Right, MOD_MASK, ACTION_FOCUS_NEXT, 0},
-    {XK_Up, MOD_MASK, ACTION_MOVE_UP, 0},
-    {XK_Down, MOD_MASK, ACTION_MOVE_DOWN, 0},
-    {XK_Left, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_LEFT, 0},
-    {XK_Right, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_RIGHT, 0},
-    {XK_Up, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_UP, 0},
-    {XK_Down, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_DOWN, 0},
-    {XK_f, MOD_MASK, ACTION_TOGGLE_FULLSCREEN, 0},
-    {XK_m, MOD_MASK, ACTION_MINIMIZE, 0},
-    {XK_m, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESTORE_MINIMIZED, 0},
-    {XK_space, MOD_MASK, ACTION_TOGGLE_FLOATING, 0},
-    {XK_1, MOD_MASK, ACTION_SET_WORKSPACE, 0},
-    {XK_2, MOD_MASK, ACTION_SET_WORKSPACE, 1},
-    {XK_3, MOD_MASK, ACTION_SET_WORKSPACE, 2},
-    {XK_4, MOD_MASK, ACTION_SET_WORKSPACE, 3},
-    {XK_1, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 0},
-    {XK_2, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 1},
-    {XK_3, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 2},
-    {XK_4, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 3},
+static KeyBinding keybindings[] = {
+    {XK_Return, MOD_MASK, ACTION_SPAWN_TERMINAL, 0, 0},
+    {XK_r, MOD_MASK, ACTION_SPAWN_MENU, 0, 0},
+    {XK_q, MOD_MASK, ACTION_CLOSE_FOCUSED, 0, 0},
+    {XK_Left, MOD_MASK, ACTION_FOCUS_PREV, 0, 0},
+    {XK_Right, MOD_MASK, ACTION_FOCUS_NEXT, 0, 0},
+    {XK_Up, MOD_MASK, ACTION_MOVE_UP, 0, 0},
+    {XK_Down, MOD_MASK, ACTION_MOVE_DOWN, 0, 0},
+    {XK_Left, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_LEFT, 0, 0},
+    {XK_Right, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_RIGHT, 0, 0},
+    {XK_Up, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_UP, 0, 0},
+    {XK_Down, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_DOWN, 0, 0},
+    {XK_f, MOD_MASK, ACTION_TOGGLE_FULLSCREEN, 0, 0},
+    {XK_m, MOD_MASK, ACTION_MINIMIZE, 0, 0},
+    {XK_m, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESTORE_MINIMIZED, 0, 0},
+    {XK_space, MOD_MASK, ACTION_TOGGLE_FLOATING, 0, 0},
+    {XK_1, MOD_MASK, ACTION_SET_WORKSPACE, 0, 0},
+    {XK_2, MOD_MASK, ACTION_SET_WORKSPACE, 1, 0},
+    {XK_3, MOD_MASK, ACTION_SET_WORKSPACE, 2, 0},
+    {XK_4, MOD_MASK, ACTION_SET_WORKSPACE, 3, 0},
+    {XK_1, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 0, 0},
+    {XK_2, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 1, 0},
+    {XK_3, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 2, 0},
+    {XK_4, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 3, 0},
 };
 
 static xcb_atom_t net_number_of_desktops = XCB_ATOM_NONE;
@@ -648,14 +649,6 @@ static xcb_keycode_t keycode_from_keysym(xcb_keysym_t sym) {
     return XCB_NO_SYMBOL;
 }
 
-static xcb_keysym_t keysym_from_keycode(xcb_keycode_t code, uint16_t state) {
-    if (!keysyms || code < keycode_min || code > keycode_max || keysyms_per_keycode <= 0) return XCB_NO_SYMBOL;
-    int idx = (code - keycode_min) * keysyms_per_keycode;
-    int col = (state & XCB_MOD_MASK_SHIFT) ? 1 : 0;
-    if (col >= keysyms_per_keycode) col = 0;
-    return keysyms[idx + col];
-}
-
 static void detect_numlock_mask(void) {
     wm.numlock_mask = 0;
     refresh_keyboard_map();
@@ -672,17 +665,28 @@ static void detect_numlock_mask(void) {
     free(rp);
 }
 
-static void grab_keys(void) {
-    xcb_ungrab_key(wm.dpy, XCB_GRAB_ANY, wm.root, XCB_MOD_MASK_ANY);
-    uint16_t modifiers[] = {0, XCB_MOD_MASK_LOCK, (uint16_t)wm.numlock_mask, (uint16_t)(XCB_MOD_MASK_LOCK | wm.numlock_mask)};
+static void init_keybinding_keycodes(void) {
+    refresh_keyboard_map();
     for (size_t i = 0; i < sizeof(keybindings) / sizeof(keybindings[0]); i++) {
-        xcb_keycode_t code = keycode_from_keysym(keybindings[i].sym);
-        if (!code || code == XCB_NO_SYMBOL) continue;
-        for (size_t m = 0; m < sizeof(modifiers) / sizeof(modifiers[0]); m++) {
-            xcb_grab_key(wm.dpy, 1, wm.root, (uint16_t)(keybindings[i].mod | modifiers[m]), code, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
-        }
+        keybindings[i].keycode = keycode_from_keysym(keybindings[i].sym);
     }
 }
+
+static void grab_key_with_lock_variants(xcb_keycode_t code, uint16_t mod) {
+    if (!code || code == XCB_NO_SYMBOL) return;
+    uint16_t modifiers[] = {0, XCB_MOD_MASK_LOCK, (uint16_t)wm.numlock_mask, (uint16_t)(XCB_MOD_MASK_LOCK | wm.numlock_mask)};
+    for (size_t i = 0; i < sizeof(modifiers) / sizeof(modifiers[0]); i++) {
+        xcb_grab_key(wm.dpy, 1, wm.root, (uint16_t)(mod | modifiers[i]), code, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+    }
+}
+
+static void grab_all_keys(void) {
+    xcb_ungrab_key(wm.dpy, XCB_GRAB_ANY, wm.root, XCB_MOD_MASK_ANY);
+    for (size_t i = 0; i < sizeof(keybindings) / sizeof(keybindings[0]); i++) {
+        grab_key_with_lock_variants(keybindings[i].keycode, keybindings[i].mod);
+    }
+}
+
 
 static void grab_buttons(void) {
     xcb_ungrab_button(wm.dpy, XCB_BUTTON_INDEX_ANY, wm.root, XCB_MOD_MASK_ANY);
@@ -729,12 +733,14 @@ static void dispatch_action(Action action, int arg) {
     }
 }
 
-static void keypress(xcb_key_press_event_t *e) {
+static void handle_keypress(xcb_key_press_event_t *e) {
     reload_runtime_config_if_changed();
-    xcb_keysym_t sym = keysym_from_keycode(e->detail, e->state);
     uint16_t clean = clean_mod_mask(e->state);
     for (size_t i = 0; i < sizeof(keybindings) / sizeof(keybindings[0]); i++) {
-        if (keybindings[i].sym == sym && keybindings[i].mod == clean) { dispatch_action(keybindings[i].action, keybindings[i].arg); return; }
+        if (keybindings[i].keycode == e->detail && keybindings[i].mod == clean) {
+            dispatch_action(keybindings[i].action, keybindings[i].arg);
+            return;
+        }
     }
 }
 
@@ -902,7 +908,8 @@ void wm_init(void) {
     setup_atoms();
     load_runtime_config();
     detect_numlock_mask();
-    grab_keys();
+    init_keybinding_keycodes();
+    grab_all_keys();
     grab_buttons();
     scan_existing_windows();
 
@@ -916,7 +923,7 @@ void wm_run(void) {
         reload_runtime_config_if_changed();
         uint8_t type = ev->response_type & ~0x80;
         switch (type) {
-            case XCB_KEY_PRESS: keypress((xcb_key_press_event_t *)ev); break;
+            case XCB_KEY_PRESS: handle_keypress((xcb_key_press_event_t *)ev); break;
             case XCB_BUTTON_PRESS: buttonpress((xcb_button_press_event_t *)ev); break;
             case XCB_BUTTON_RELEASE: buttonrelease((xcb_button_release_event_t *)ev); break;
             case XCB_MOTION_NOTIFY: motionnotify((xcb_motion_notify_event_t *)ev); break;
