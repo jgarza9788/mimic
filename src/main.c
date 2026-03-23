@@ -2,6 +2,8 @@
 
 #include "wm.h"
 
+// Handles main for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 int main(void) {
     /* Lifecycle: initialize resources, run the event loop, then clean up. */
     wm_init();

@@ -80,11 +80,15 @@ static uint8_t keycode_min = 0;
 static uint8_t keycode_max = 0;
 static int keysyms_per_keycode = 0;
 
+// Handles die for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void die(const char *msg) {
     fprintf(stderr, "mimicwm: %s\n", msg);
     exit(EXIT_FAILURE);
 }
 
+// Handles xcb check ok for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool xcb_check_ok(xcb_void_cookie_t ck) {
     xcb_generic_error_t *err = xcb_request_check(wm.dpy, ck);
     if (!err) return true;
@@ -97,6 +101,8 @@ static bool xcb_check_ok(xcb_void_cookie_t ck) {
     return false;
 }
 
+// Handles atom for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static xcb_atom_t atom(const char *name) {
     xcb_intern_atom_cookie_t ck = xcb_intern_atom(wm.dpy, 0, (uint16_t)strlen(name), name);
     xcb_intern_atom_reply_t *rp = xcb_intern_atom_reply(wm.dpy, ck, NULL);
@@ -106,6 +112,8 @@ static xcb_atom_t atom(const char *name) {
     return a;
 }
 
+// Handles color from hex for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static uint32_t color_from_hex(uint32_t rgb) {
     uint16_t red = (uint16_t)(((rgb >> 16) & 0xff) * 257);
     uint16_t green = (uint16_t)(((rgb >> 8) & 0xff) * 257);
@@ -118,18 +126,30 @@ static uint32_t color_from_hex(uint32_t rgb) {
     return pixel;
 }
 
+// Handles set property 32 for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void set_property32(xcb_window_t win, xcb_atom_t prop, xcb_atom_t type, const uint32_t *vals, uint32_t n) {
     xcb_change_property(wm.dpy, XCB_PROP_MODE_REPLACE, win, prop, type, 32, n, vals);
 }
 
+// Handles delete property for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void delete_property(xcb_window_t win, xcb_atom_t prop) {
     xcb_delete_property(wm.dpy, win, prop);
 }
 
+// Handles has path separator for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool has_path_separator(const char *cmd) { return cmd && strchr(cmd, '/') != NULL; }
+// Handles trim leading spaces for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void trim_leading_spaces(const char **p) { while (**p && isspace((unsigned char)**p)) (*p)++; }
+// Handles trim trailing whitespace for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void trim_trailing_whitespace(char *s) { size_t len = strlen(s); while (len > 0 && isspace((unsigned char)s[len - 1])) s[--len] = '\0'; }
 
+// Handles copy config value for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool copy_config_value(char *dest, size_t dest_size, const char *src) {
     if (!dest || dest_size == 0) return false;
     dest[0] = '\0';
@@ -150,6 +170,8 @@ static bool copy_config_value(char *dest, size_t dest_size, const char *src) {
     return true;
 }
 
+// Handles first existing path for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool first_existing_path(char *dest, size_t dest_size, const char *const *candidates) {
     struct stat st = {0};
     for (size_t i = 0; candidates[i]; i++) {
@@ -161,6 +183,8 @@ static bool first_existing_path(char *dest, size_t dest_size, const char *const 
     return false;
 }
 
+// Handles resolve runtime config path for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void resolve_runtime_config_path(char *out, size_t out_size) {
     out[0] = '\0';
     const char *home = getenv("HOME");
@@ -176,6 +200,8 @@ static void resolve_runtime_config_path(char *out, size_t out_size) {
     (void)first_existing_path(out, out_size, system_candidates);
 }
 
+// Handles load runtime config for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void load_runtime_config(void) {
     RuntimeConfig candidate = wm.runtime_config;
     char path[sizeof(wm.runtime_toml_path)] = {0};
@@ -226,6 +252,8 @@ static void load_runtime_config(void) {
     wm.runtime_toml_mtime_sec = st.st_mtime;
 }
 
+// Handles reload runtime config if changed for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void reload_runtime_config_if_changed(void) {
     char path[sizeof(wm.runtime_toml_path)] = {0};
     resolve_runtime_config_path(path, sizeof(path));
@@ -241,6 +269,8 @@ static void reload_runtime_config_if_changed(void) {
     if (strncmp(path, wm.runtime_toml_path, sizeof(wm.runtime_toml_path)) != 0 || st.st_mtime != wm.runtime_toml_mtime_sec) load_runtime_config();
 }
 
+// Handles command exists for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool command_exists(const char *cmd) {
     if (!cmd || !*cmd) return false;
     const char *p = cmd;
@@ -267,6 +297,8 @@ static bool command_exists(const char *cmd) {
     return false;
 }
 
+// Handles spawn for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void spawn(const char *cmd) {
     if (!command_exists(cmd)) return;
     pid_t pid = fork();
@@ -278,6 +310,8 @@ static void spawn(const char *cmd) {
     }
 }
 
+// Handles spawn first available for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void spawn_first_available(const char *preferred, const char *const *fallbacks) {
     if (preferred && command_exists(preferred)) {
         spawn(preferred);
@@ -291,6 +325,8 @@ static void spawn_first_available(const char *preferred, const char *const *fall
     }
 }
 
+// Handles spawn terminal for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void spawn_terminal(void) {
     static const char *const fallbacks[] = {"xterm", "x-terminal-emulator", "alacritty", "kitty", "wezterm", "gnome-terminal", "konsole", "xfce4-terminal", NULL};
     const char *preferred = getenv("MIMICWM_TERMINAL");
@@ -298,6 +334,8 @@ static void spawn_terminal(void) {
     spawn_first_available(preferred, fallbacks);
 }
 
+// Handles spawn menu for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void spawn_menu(void) {
     static const char *const fallbacks[] = {"dmenu_run", "rofi -show drun", "wofi --show drun", NULL};
     const char *preferred = getenv("MIMICWM_MENU");
@@ -307,9 +345,15 @@ static void spawn_menu(void) {
 
 static WorkspaceState *current_workspace_state(void) { return &wm.workspaces[wm.current_workspace]; }
 static Client *find_client(xcb_window_t w) { for (Client *c = wm.clients; c; c = c->next) if (c->win == w) return c; return NULL; }
+// Handles is visible for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool is_visible(Client *c) { return c && !c->is_minimized && c->workspace == wm.current_workspace; }
+// Handles is scroll managed for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool is_scroll_managed(Client *c) { return c && !c->is_floating && !c->is_transient; }
 
+// Handles workspace attach tail for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void workspace_attach_tail(WorkspaceState *ws, Client *c) {
     c->ws_prev = NULL; c->ws_next = NULL;
     if (!ws->scroll_head) { ws->scroll_head = c; return; }
@@ -318,6 +362,8 @@ static void workspace_attach_tail(WorkspaceState *ws, Client *c) {
     tail->ws_next = c; c->ws_prev = tail;
 }
 
+// Handles workspace detach for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void workspace_detach(Client *c) {
     WorkspaceState *ws = &wm.workspaces[c->workspace];
     if (ws->scroll_head == c) ws->scroll_head = c->ws_next;
@@ -328,17 +374,27 @@ static void workspace_detach(Client *c) {
     c->ws_prev = NULL; c->ws_next = NULL;
 }
 
+// Handles update current desktop for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void update_current_desktop(void) { uint32_t v = (uint32_t)wm.current_workspace; set_property32(wm.root, wm.net_current_desktop, XCB_ATOM_CARDINAL, &v, 1); }
+// Handles set client desktop for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void set_client_desktop(Client *c) { uint32_t v = (uint32_t)c->workspace; set_property32(c->win, wm.net_wm_desktop, XCB_ATOM_CARDINAL, &v, 1); }
 
+// Handles set border for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void set_border(xcb_window_t win, uint32_t color) {
     uint32_t vals[] = {color};
     xcb_configure_window(wm.dpy, win, XCB_CONFIG_WINDOW_BORDER_WIDTH, (uint32_t[]){BORDER_WIDTH});
     xcb_change_window_attributes(wm.dpy, win, XCB_CW_BORDER_PIXEL, vals);
 }
 
+// Handles raise window for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void raise_window(xcb_window_t win) { xcb_configure_window(wm.dpy, win, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_ABOVE}); }
 
+// Handles set input focus for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void set_input_focus(Client *c) {
     if (!c || !is_visible(c)) {
         xcb_set_input_focus(wm.dpy, XCB_INPUT_FOCUS_POINTER_ROOT, wm.root, XCB_CURRENT_TIME);
@@ -362,6 +418,8 @@ static Client *workspace_find_first_focusable(WorkspaceState *ws) {
     return NULL;
 }
 
+// Handles focus scroll relative for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void focus_scroll_relative(int direction) {
     WorkspaceState *ws = current_workspace_state();
     Client *start = ws->scroll_focus;
@@ -380,6 +438,8 @@ static void focus_scroll_relative(int direction) {
     set_input_focus(start);
 }
 
+// Handles update visibility for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void update_visibility(void) {
     for (Client *c = wm.clients; c; c = c->next) {
         if (is_visible(c)) xcb_map_window(wm.dpy, c->win);
@@ -387,6 +447,8 @@ static void update_visibility(void) {
     }
 }
 
+// Handles move resize for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void move_resize(xcb_window_t win, int x, int y, int w, int h) {
     uint32_t vals[] = {(uint32_t)x, (uint32_t)y, (uint32_t)w, (uint32_t)h};
     xcb_configure_window(wm.dpy, win, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, vals);
@@ -398,6 +460,8 @@ static Client *workspace_fullscreen_client(WorkspaceState *ws) {
     return NULL;
 }
 
+// Handles arrange scroll workspace for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void arrange_scroll_workspace(WorkspaceState *ws) {
     Client *focused = ws->scroll_focus;
     if (!focused || !is_visible(focused) || !is_scroll_managed(focused) || focused->is_fullscreen) { focused = workspace_find_first_focusable(ws); ws->scroll_focus = focused; }
@@ -425,6 +489,8 @@ static void arrange_scroll_workspace(WorkspaceState *ws) {
     }
 }
 
+// Handles arrange for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void arrange(void) {
     update_visibility();
     WorkspaceState *ws = current_workspace_state();
@@ -449,6 +515,8 @@ static void arrange(void) {
     xcb_flush(wm.dpy);
 }
 
+// Handles is dock window for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool is_dock_window(xcb_window_t w) {
     xcb_get_property_cookie_t ck = xcb_get_property(wm.dpy, 0, w, wm.net_wm_window_type, XCB_ATOM_ATOM, 0, 8);
     xcb_get_property_reply_t *rp = xcb_get_property_reply(wm.dpy, ck, NULL);
@@ -461,6 +529,8 @@ static bool is_dock_window(xcb_window_t w) {
     return dock;
 }
 
+// Handles window is unmapped for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool window_is_unmapped(xcb_window_t w, bool *override_redirect) {
     xcb_get_window_attributes_reply_t *ar = xcb_get_window_attributes_reply(wm.dpy, xcb_get_window_attributes(wm.dpy, w), NULL);
     if (!ar) return true;
@@ -470,6 +540,8 @@ static bool window_is_unmapped(xcb_window_t w, bool *override_redirect) {
     return unmapped;
 }
 
+// Handles is iconic for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool is_iconic(xcb_window_t w) {
     xcb_get_property_cookie_t ck = xcb_get_property(wm.dpy, 0, w, wm_hints, wm_hints, 0, 9);
     xcb_get_property_reply_t *rp = xcb_get_property_reply(wm.dpy, ck, NULL);
@@ -485,6 +557,8 @@ static bool is_iconic(xcb_window_t w) {
     return iconic;
 }
 
+// Handles is transient window for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool is_transient_window(xcb_window_t w) {
     xcb_get_property_cookie_t ck = xcb_get_property(wm.dpy, 0, w, wm_transient_for, XCB_ATOM_WINDOW, 0, 1);
     xcb_get_property_reply_t *rp = xcb_get_property_reply(wm.dpy, ck, NULL);
@@ -523,6 +597,8 @@ static Client *manage(xcb_window_t w) {
     return c;
 }
 
+// Handles unmanage for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void unmanage(Client *c) {
     if (!c) return;
     if (!c->is_floating) workspace_detach(c);
@@ -534,6 +610,8 @@ static void unmanage(Client *c) {
     free(c);
 }
 
+// Handles client close for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void client_close(Client *c) {
     if (!c) return;
     xcb_get_property_reply_t *rp = xcb_get_property_reply(wm.dpy, xcb_get_property(wm.dpy, 0, c->win, wm.wm_protocols, XCB_ATOM_ATOM, 0, 16), NULL);
@@ -559,6 +637,8 @@ static void client_close(Client *c) {
     xcb_kill_client(wm.dpy, c->win);
 }
 
+// Handles client toggle fullscreen for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void client_toggle_fullscreen(Client *c) {
     if (!c) return;
     c->is_fullscreen = !c->is_fullscreen;
@@ -573,11 +653,19 @@ static void client_toggle_fullscreen(Client *c) {
     arrange();
 }
 
+// Handles can floating move resize for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static bool can_floating_move_resize(Client *c) { return c && !c->is_fullscreen && (c->is_floating || c->is_transient); }
 
+// Handles client move for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void client_move(Client *c, int dx, int dy) { if (!can_floating_move_resize(c)) return; c->x += dx; c->y += dy; xcb_configure_window(wm.dpy, c->win, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, (uint32_t[]){(uint32_t)c->x, (uint32_t)c->y}); }
+// Handles client resize for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void client_resize(Client *c, int dw, int dh) { if (!can_floating_move_resize(c)) return; c->w += dw; c->h += dh; if (c->w < 120) c->w = 120; if (c->h < 80) c->h = 80; xcb_configure_window(wm.dpy, c->win, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, (uint32_t[]){(uint32_t)c->w, (uint32_t)c->h}); }
 
+// Handles client minimize for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void client_minimize(Client *c) {
     if (!c) return;
     c->is_minimized = true;
@@ -586,6 +674,8 @@ static void client_minimize(Client *c) {
     arrange();
 }
 
+// Handles client restore last for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void client_restore_last(void) {
     WorkspaceState *ws = current_workspace_state();
     Client *start = ws->min_restore_cursor ? ws->min_restore_cursor : wm.clients;
@@ -601,8 +691,12 @@ static void client_restore_last(void) {
     arrange();
 }
 
+// Handles set workspace for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void set_workspace(int ws) { if (ws < 0 || ws >= WORKSPACE_COUNT || ws == wm.current_workspace) return; wm.current_workspace = ws; update_current_desktop(); wm.focused = NULL; arrange(); }
 
+// Handles move client workspace for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void move_client_workspace(Client *c, int ws) {
     if (!c || ws < 0 || ws >= WORKSPACE_COUNT) return;
     if (!c->is_floating) workspace_detach(c);
@@ -620,8 +714,12 @@ static void move_client_workspace(Client *c, int ws) {
     arrange();
 }
 
+// Handles clean mod mask for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static uint16_t clean_mod_mask(uint16_t state) { return (uint16_t)(state & ~(XCB_MOD_MASK_LOCK | wm.numlock_mask)); }
 
+// Handles refresh keyboard map for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void refresh_keyboard_map(void) {
     const xcb_setup_t *setup = xcb_get_setup(wm.dpy);
     keycode_min = setup->min_keycode;
@@ -637,6 +735,8 @@ static void refresh_keyboard_map(void) {
     free(rp);
 }
 
+// Handles keycode from keysym for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static xcb_keycode_t keycode_from_keysym(xcb_keysym_t sym) {
     if (!keysyms || keysyms_per_keycode <= 0) return XCB_NO_SYMBOL;
     int count = keycode_max - keycode_min + 1;
@@ -648,6 +748,8 @@ static xcb_keycode_t keycode_from_keysym(xcb_keysym_t sym) {
     return XCB_NO_SYMBOL;
 }
 
+// Handles keysym from keycode for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static xcb_keysym_t keysym_from_keycode(xcb_keycode_t code, uint16_t state) {
     if (!keysyms || code < keycode_min || code > keycode_max || keysyms_per_keycode <= 0) return XCB_NO_SYMBOL;
     int idx = (code - keycode_min) * keysyms_per_keycode;
@@ -656,6 +758,8 @@ static xcb_keysym_t keysym_from_keycode(xcb_keycode_t code, uint16_t state) {
     return keysyms[idx + col];
 }
 
+// Handles detect numlock mask for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void detect_numlock_mask(void) {
     wm.numlock_mask = 0;
     refresh_keyboard_map();
@@ -672,6 +776,8 @@ static void detect_numlock_mask(void) {
     free(rp);
 }
 
+// Handles grab keys for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void grab_keys(void) {
     xcb_ungrab_key(wm.dpy, XCB_GRAB_ANY, wm.root, XCB_MOD_MASK_ANY);
     uint16_t modifiers[] = {0, XCB_MOD_MASK_LOCK, (uint16_t)wm.numlock_mask, (uint16_t)(XCB_MOD_MASK_LOCK | wm.numlock_mask)};
@@ -684,6 +790,8 @@ static void grab_keys(void) {
     }
 }
 
+// Handles grab buttons for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void grab_buttons(void) {
     xcb_ungrab_button(wm.dpy, XCB_BUTTON_INDEX_ANY, wm.root, XCB_MOD_MASK_ANY);
     uint16_t mods[] = {MOD_MASK, (uint16_t)(MOD_MASK | XCB_MOD_MASK_LOCK), (uint16_t)(MOD_MASK | wm.numlock_mask), (uint16_t)(MOD_MASK | XCB_MOD_MASK_LOCK | wm.numlock_mask)};
@@ -695,6 +803,8 @@ static void grab_buttons(void) {
     }
 }
 
+// Handles dispatch action for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void dispatch_action(Action action, int arg) {
     switch (action) {
         case ACTION_SPAWN_TERMINAL: spawn_terminal(); break;
@@ -729,6 +839,8 @@ static void dispatch_action(Action action, int arg) {
     }
 }
 
+// Handles keypress for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void keypress(xcb_key_press_event_t *e) {
     reload_runtime_config_if_changed();
     xcb_keysym_t sym = keysym_from_keycode(e->detail, e->state);
@@ -738,6 +850,8 @@ static void keypress(xcb_key_press_event_t *e) {
     }
 }
 
+// Handles buttonpress for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void buttonpress(xcb_button_press_event_t *e) {
     if (clean_mod_mask(e->state) != MOD_MASK) return;
     Client *c = find_client(e->child ? e->child : e->event);
@@ -752,6 +866,8 @@ static void buttonpress(xcb_button_press_event_t *e) {
                      XCB_NONE, XCB_NONE, XCB_CURRENT_TIME);
 }
 
+// Handles motionnotify for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void motionnotify(xcb_motion_notify_event_t *e) {
     if (!wm.drag_active || !wm.drag_client) return;
     Client *c = wm.drag_client;
@@ -768,6 +884,8 @@ static void motionnotify(xcb_motion_notify_event_t *e) {
     }
 }
 
+// Handles buttonrelease for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void buttonrelease(xcb_button_release_event_t *e) {
     (void)e;
     wm.drag_active = false;
@@ -775,12 +893,16 @@ static void buttonrelease(xcb_button_release_event_t *e) {
     xcb_ungrab_pointer(wm.dpy, XCB_CURRENT_TIME);
 }
 
+// Handles maprequest for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void maprequest(xcb_map_request_event_t *e) {
     Client *c = manage(e->window);
     if (!c) { xcb_map_window(wm.dpy, e->window); return; }
     arrange();
 }
 
+// Handles configurerequest for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void configurerequest(xcb_configure_request_event_t *e) {
     uint16_t mask = 0;
     uint32_t vals[7];
@@ -807,8 +929,12 @@ static void configurerequest(xcb_configure_request_event_t *e) {
     if (mask) xcb_configure_window(wm.dpy, e->window, mask, vals);
 }
 
+// Handles destroynotify for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void destroynotify(xcb_destroy_notify_event_t *e) { Client *c = find_client(e->window); if (c) { unmanage(c); arrange(); } }
 
+// Handles unmapnotify for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void unmapnotify(xcb_unmap_notify_event_t *e) {
     Client *c = find_client(e->window);
     if (!c) return;
@@ -817,6 +943,8 @@ static void unmapnotify(xcb_unmap_notify_event_t *e) {
     arrange();
 }
 
+// Handles enternotify for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void enternotify(xcb_enter_notify_event_t *e) {
     Client *c = find_client(e->event);
     if (c && c != wm.focused && is_visible(c)) {
@@ -825,6 +953,8 @@ static void enternotify(xcb_enter_notify_event_t *e) {
     }
 }
 
+// Handles clientmessage for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void clientmessage(xcb_client_message_event_t *e) {
     if (e->type == wm.net_active_window) {
         long source = (long)e->data.data32[0];
@@ -836,6 +966,8 @@ static void clientmessage(xcb_client_message_event_t *e) {
     if (e->type == wm.net_current_desktop) set_workspace((int)e->data.data32[0]);
 }
 
+// Handles scan existing windows for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void scan_existing_windows(void) {
     xcb_query_tree_reply_t *qr = xcb_query_tree_reply(wm.dpy, xcb_query_tree(wm.dpy, wm.root), NULL);
     if (!qr) return;
@@ -850,6 +982,8 @@ static void scan_existing_windows(void) {
     arrange();
 }
 
+// Handles setup atoms for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 static void setup_atoms(void) {
     wm.wm_protocols = atom("WM_PROTOCOLS");
     wm.wm_delete = atom("WM_DELETE_WINDOW");
@@ -874,6 +1008,8 @@ static void setup_atoms(void) {
     update_current_desktop();
 }
 
+// Handles wm init for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 void wm_init(void) {
     signal(SIGCHLD, SIG_IGN);
     int screen_idx = 0;
@@ -909,6 +1045,8 @@ void wm_init(void) {
     xcb_flush(wm.dpy);
 }
 
+// Handles wm run for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 void wm_run(void) {
     while (wm.running) {
         xcb_generic_event_t *ev = xcb_wait_for_event(wm.dpy);
@@ -932,6 +1070,8 @@ void wm_run(void) {
     }
 }
 
+// Handles wm cleanup for mimicwm.
+// Keeps behavior localized to this function for easier maintenance.
 void wm_cleanup(void) {
     while (wm.clients) {
         Client *next = wm.clients->next;
