@@ -1,6 +1,7 @@
 #include <X11/keysym.h>
 #include <ctype.h>
 #include <errno.h>
+#include <strings.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,31 +45,41 @@ typedef struct {
     int arg;
 } KeyBinding;
 
-static const KeyBinding keybindings[] = {
-    {XK_Return, MOD_MASK, ACTION_SPAWN_TERMINAL, 0},
-    {XK_r, MOD_MASK, ACTION_SPAWN_MENU, 0},
-    {XK_q, MOD_MASK, ACTION_CLOSE_FOCUSED, 0},
-    {XK_Left, MOD_MASK, ACTION_FOCUS_PREV, 0},
-    {XK_Right, MOD_MASK, ACTION_FOCUS_NEXT, 0},
-    {XK_Up, MOD_MASK, ACTION_MOVE_UP, 0},
-    {XK_Down, MOD_MASK, ACTION_MOVE_DOWN, 0},
-    {XK_Left, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_LEFT, 0},
-    {XK_Right, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_RIGHT, 0},
-    {XK_Up, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_UP, 0},
-    {XK_Down, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESIZE_DOWN, 0},
-    {XK_f, MOD_MASK, ACTION_TOGGLE_FULLSCREEN, 0},
-    {XK_m, MOD_MASK, ACTION_MINIMIZE, 0},
-    {XK_m, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_RESTORE_MINIMIZED, 0},
-    {XK_space, MOD_MASK, ACTION_TOGGLE_FLOATING, 0},
-    {XK_1, MOD_MASK, ACTION_SET_WORKSPACE, 0},
-    {XK_2, MOD_MASK, ACTION_SET_WORKSPACE, 1},
-    {XK_3, MOD_MASK, ACTION_SET_WORKSPACE, 2},
-    {XK_4, MOD_MASK, ACTION_SET_WORKSPACE, 3},
-    {XK_1, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 0},
-    {XK_2, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 1},
-    {XK_3, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 2},
-    {XK_4, MOD_MASK | XCB_MOD_MASK_SHIFT, ACTION_MOVE_TO_WORKSPACE, 3},
-};
+/* Dynamic keybinding list populated from TOML config at runtime. */
+static KeyBinding *keybindings = NULL;
+static size_t keybindings_count = 0;
+
+static void free_keybindings(void) {
+    free(keybindings);
+    keybindings = NULL;
+    keybindings_count = 0;
+}
+
+static bool append_keybinding(KeyBinding **arr, size_t *count, KeyBinding kb) {
+    KeyBinding *n = realloc(*arr, (*count + 1) * sizeof(KeyBinding));
+    if (!n) return false;
+    n[*count] = kb;
+    *arr = n;
+    (*count)++;
+    return true;
+}
+
+static xcb_keysym_t keysym_from_name(const char *name) {
+    if (!name || !*name) return XCB_NO_SYMBOL;
+    if (strcasecmp(name, "Enter") == 0 || strcasecmp(name, "Return") == 0) return XK_Return;
+    if (strcasecmp(name, "Space") == 0) return XK_space;
+    if (strcasecmp(name, "Left") == 0) return XK_Left;
+    if (strcasecmp(name, "Right") == 0) return XK_Right;
+    if (strcasecmp(name, "Up") == 0) return XK_Up;
+    if (strcasecmp(name, "Down") == 0) return XK_Down;
+    if (strcasecmp(name, "Tab") == 0) return XK_Tab;
+    if (strlen(name) == 1) {
+        char c = name[0];
+        if (isalpha((unsigned char)c)) return (xcb_keysym_t)tolower((unsigned char)c);
+        if (isdigit((unsigned char)c)) return (xcb_keysym_t)c;
+    }
+    return XCB_NO_SYMBOL;
+}
 
 static xcb_atom_t net_number_of_desktops = XCB_ATOM_NONE;
 static xcb_atom_t wm_transient_for = XCB_ATOM_NONE;
@@ -207,9 +218,13 @@ static void load_runtime_config(void) {
     char path[sizeof(wm.runtime_toml_path)] = {0};
     resolve_runtime_config_path(path, sizeof(path));
     if (!path[0]) {
-        wm.runtime_toml_path[0] = '\0';
-        wm.runtime_toml_mtime_sec = 0;
-        return;
+        /* No user/system runtime file found — try bundled repo default. */
+        snprintf(path, sizeof(path), "config/config.toml");
+        if (!path[0]) {
+            wm.runtime_toml_path[0] = '\0';
+            wm.runtime_toml_mtime_sec = 0;
+            return;
+        }
     }
 
     struct stat st = {0};
@@ -221,6 +236,9 @@ static void load_runtime_config(void) {
     bool parse_error = false;
     bool in_commands = false;
     bool in_picom = false;
+    bool in_hotkeys = false;
+    KeyBinding *kb_temp = NULL;
+    size_t kb_count = 0;
     char line[2048] = {0};
     while (fgets(line, sizeof(line), fp)) {
         trim_trailing_whitespace(line);
@@ -230,10 +248,11 @@ static void load_runtime_config(void) {
         if (*p == '[') {
             in_commands = strncmp(p, "[commands]", 10) == 0;
             in_picom = strncmp(p, "[picom]", 7) == 0;
+            in_hotkeys = strncmp(p, "[hotkeys]", 9) == 0;
             continue;
         }
         const char *eq = strchr(p, '=');
-        if ((in_commands || in_picom) && !eq) {
+        if ((in_commands || in_picom || in_hotkeys) && !eq) {
             parse_error = true;
             continue;
         }
@@ -243,13 +262,101 @@ static void load_runtime_config(void) {
             if (!copy_config_value(candidate.menu, sizeof(candidate.menu), eq + 1)) parse_error = true;
         } else if (in_picom && strncmp(p, "backend", 7) == 0) {
             if (!copy_config_value(candidate.picom_backend, sizeof(candidate.picom_backend), eq + 1)) parse_error = true;
+        } else if (in_hotkeys) {
+            /* Parse a hotkey entry like: "Super+Enter" = "Description" */
+            size_t left_len = (size_t)(eq - p);
+            char keybuf[256] = {0};
+            if (left_len >= sizeof(keybuf)) left_len = sizeof(keybuf) - 1;
+            while (left_len > 0 && isspace((unsigned char)p[left_len - 1])) left_len--;
+            /* copy and trim spaces */
+            size_t klen = 0;
+            for (size_t i = 0; i < left_len && i + 1 < sizeof(keybuf); i++) keybuf[klen++] = p[i];
+            keybuf[klen] = '\0';
+            /* trim leading/trailing spaces */
+            char *ks = keybuf;
+            while (*ks && isspace((unsigned char)*ks)) ks++;
+            char *ke = ks + strlen(ks) - 1;
+            while (ke >= ks && isspace((unsigned char)*ke)) { *ke = '\0'; ke--; }
+            /* strip surrounding quotes */
+            if (*ks == '"' && ks[strlen(ks) - 1] == '"') {
+                ks[strlen(ks) - 1] = '\0'; ks++;
+            }
+            /* split tokens by '+' */
+            char tokbuf[256];
+            strncpy(tokbuf, ks, sizeof(tokbuf) - 1);
+            tokbuf[sizeof(tokbuf) - 1] = '\0';
+            char *save = NULL;
+            char *tok = strtok_r(tokbuf, "+", &save);
+            uint16_t mod = 0;
+            char last_token[64] = {0};
+            while (tok) {
+                char ttrim[64];
+                size_t tl = 0;
+                /* trim token */
+                char *ts = tok; while (*ts && isspace((unsigned char)*ts)) ts++;
+                char *te = ts + strlen(ts) - 1; while (te >= ts && isspace((unsigned char)*te)) *te-- = '\0';
+                strncpy(ttrim, ts, sizeof(ttrim) - 1);
+                ttrim[sizeof(ttrim) - 1] = '\0';
+                if (strcasecmp(ttrim, "Super") == 0 || strcasecmp(ttrim, "Mod4") == 0) mod |= MOD_MASK;
+                else if (strcasecmp(ttrim, "Shift") == 0) mod |= XCB_MOD_MASK_SHIFT;
+                else if (strcasecmp(ttrim, "Control") == 0 || strcasecmp(ttrim, "Ctrl") == 0) mod |= XCB_MOD_MASK_CONTROL;
+                else strncpy(last_token, ttrim, sizeof(last_token) - 1);
+                tok = strtok_r(NULL, "+", &save);
+            }
+            /* handle numeric ranges like 1..4 */
+            char *range = strstr(last_token, "..");
+            if (range) {
+                int a = atoi(last_token);
+                int b = atoi(range + 2);
+                if (a <= 0 || b <= 0 || a > b) continue;
+                for (int n = a; n <= b; n++) {
+                    KeyBinding kb = {0};
+                    char nums[4]; snprintf(nums, sizeof(nums), "%d", n);
+                    kb.sym = keysym_from_name(nums);
+                    kb.mod = mod;
+                    kb.action = (mod & XCB_MOD_MASK_SHIFT) ? ACTION_MOVE_TO_WORKSPACE : ACTION_SET_WORKSPACE;
+                    kb.arg = n - 1;
+                    if (!append_keybinding(&kb_temp, &kb_count, kb)) { parse_error = true; break; }
+                }
+            } else {
+                KeyBinding kb = {0};
+                kb.sym = keysym_from_name(last_token);
+                kb.mod = mod;
+                kb.arg = 0;
+                /* Decide action by key + modifiers */
+                if (kb.sym == XK_Return) kb.action = ACTION_SPAWN_TERMINAL;
+                else if (kb.sym == (xcb_keysym_t)tolower('r')) kb.action = ACTION_SPAWN_MENU;
+                else if (kb.sym == (xcb_keysym_t)tolower('q')) kb.action = ACTION_CLOSE_FOCUSED;
+                else if (kb.sym == XK_Left) kb.action = (mod & XCB_MOD_MASK_SHIFT) ? ACTION_RESIZE_LEFT : ACTION_FOCUS_PREV;
+                else if (kb.sym == XK_Right) kb.action = (mod & XCB_MOD_MASK_SHIFT) ? ACTION_RESIZE_RIGHT : ACTION_FOCUS_NEXT;
+                else if (kb.sym == XK_Up) kb.action = (mod & XCB_MOD_MASK_SHIFT) ? ACTION_RESIZE_UP : ACTION_MOVE_UP;
+                else if (kb.sym == XK_Down) kb.action = (mod & XCB_MOD_MASK_SHIFT) ? ACTION_RESIZE_DOWN : ACTION_MOVE_DOWN;
+                else if (kb.sym == (xcb_keysym_t)tolower('f')) kb.action = ACTION_TOGGLE_FULLSCREEN;
+                else if (kb.sym == (xcb_keysym_t)tolower('m')) kb.action = (mod & XCB_MOD_MASK_SHIFT) ? ACTION_RESTORE_MINIMIZED : ACTION_MINIMIZE;
+                else if (kb.sym == XK_space) kb.action = ACTION_TOGGLE_FLOATING;
+                else if (kb.sym >= '1' && kb.sym <= '9') {
+                    if (mod & XCB_MOD_MASK_SHIFT) kb.action = ACTION_MOVE_TO_WORKSPACE; else kb.action = ACTION_SET_WORKSPACE;
+                    kb.arg = (int)kb.sym - '1';
+                } else {
+                    /* Unknown mapping; skip */
+                    continue;
+                }
+                if (!append_keybinding(&kb_temp, &kb_count, kb)) parse_error = true;
+            }
         }
     }
     fclose(fp);
-    if (parse_error) return;
+    if (parse_error) {
+        free(kb_temp);
+        return;
+    }
     wm.runtime_config = candidate;
     snprintf(wm.runtime_toml_path, sizeof(wm.runtime_toml_path), "%s", path);
     wm.runtime_toml_mtime_sec = st.st_mtime;
+    /* Replace active keybindings with parsed ones (if any). */
+    free_keybindings();
+    keybindings = kb_temp;
+    keybindings_count = kb_count;
 }
 
 // Handles reload runtime config if changed for mimicwm.
@@ -258,15 +365,19 @@ static void reload_runtime_config_if_changed(void) {
     char path[sizeof(wm.runtime_toml_path)] = {0};
     resolve_runtime_config_path(path, sizeof(path));
     if (!path[0]) {
-        if (wm.runtime_toml_path[0]) load_runtime_config();
+        if (wm.runtime_toml_path[0]) { load_runtime_config(); detect_numlock_mask(); grab_keys(); }
         return;
     }
     struct stat st = {0};
     if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
-        if (wm.runtime_toml_path[0]) load_runtime_config();
+        if (wm.runtime_toml_path[0]) { load_runtime_config(); detect_numlock_mask(); grab_keys(); }
         return;
     }
-    if (strncmp(path, wm.runtime_toml_path, sizeof(wm.runtime_toml_path)) != 0 || st.st_mtime != wm.runtime_toml_mtime_sec) load_runtime_config();
+    if (strncmp(path, wm.runtime_toml_path, sizeof(wm.runtime_toml_path)) != 0 || st.st_mtime != wm.runtime_toml_mtime_sec) {
+        load_runtime_config();
+        detect_numlock_mask();
+        grab_keys();
+    }
 }
 
 // Handles command exists for mimicwm.
@@ -781,7 +892,7 @@ static void detect_numlock_mask(void) {
 static void grab_keys(void) {
     xcb_ungrab_key(wm.dpy, XCB_GRAB_ANY, wm.root, XCB_MOD_MASK_ANY);
     uint16_t modifiers[] = {0, XCB_MOD_MASK_LOCK, (uint16_t)wm.numlock_mask, (uint16_t)(XCB_MOD_MASK_LOCK | wm.numlock_mask)};
-    for (size_t i = 0; i < sizeof(keybindings) / sizeof(keybindings[0]); i++) {
+    for (size_t i = 0; i < keybindings_count; i++) {
         xcb_keycode_t code = keycode_from_keysym(keybindings[i].sym);
         if (!code || code == XCB_NO_SYMBOL) continue;
         for (size_t m = 0; m < sizeof(modifiers) / sizeof(modifiers[0]); m++) {
@@ -845,7 +956,7 @@ static void keypress(xcb_key_press_event_t *e) {
     reload_runtime_config_if_changed();
     xcb_keysym_t sym = keysym_from_keycode(e->detail, e->state);
     uint16_t clean = clean_mod_mask(e->state);
-    for (size_t i = 0; i < sizeof(keybindings) / sizeof(keybindings[0]); i++) {
+    for (size_t i = 0; i < keybindings_count; i++) {
         if (keybindings[i].sym == sym && keybindings[i].mod == clean) { dispatch_action(keybindings[i].action, keybindings[i].arg); return; }
     }
 }
@@ -1078,6 +1189,7 @@ void wm_cleanup(void) {
         free(wm.clients);
         wm.clients = next;
     }
+    free_keybindings();
     free(keysyms);
     if (wm.dpy) xcb_disconnect(wm.dpy);
 }
